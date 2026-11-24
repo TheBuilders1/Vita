@@ -6,11 +6,11 @@ import os
 import secrets
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
+from functools import partial
 from pathlib import Path
 from uuid import UUID, uuid4
 
 from fastapi import (
-    BackgroundTasks,
     Depends,
     FastAPI,
     File,
@@ -39,6 +39,7 @@ from app.schemas import (
 )
 from app.security import authenticated_user, bearer_token, token_digest
 from app.worker import (
+    RunDispatcher,
     RunSignals,
     claim_scan,
     dispatch_run,
@@ -102,6 +103,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.state.settings = config
     api.state.connect = lambda: connect(config)
     api.state.signals = RunSignals()
+    api.state.dispatcher = RunDispatcher()
     api.state.openclaw_client = OpenClawClient(config)
     api.state.ocr = TesseractOCR()
 
@@ -194,12 +196,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def create_run(
         body: CreateRunBody,
         request: Request,
-        background_tasks: BackgroundTasks,
         user_id: UUID = Depends(authenticated_user),
     ) -> RunAccepted:
         settings = request.app.state.settings
         run_id = uuid4()
-        session_key = f"vita:run:{run_id}"
+        session_key = f"agent:{settings.openclaw_agent_id}:vita:run:{run_id}"
         report_ref = secrets.token_urlsafe(32)
         scan_ref = secrets.token_urlsafe(32) if body.document_id else None
         deadline = datetime.now(timezone.utc) + timedelta(
@@ -253,15 +254,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
 
         request.app.state.signals.register(run_id)
-        background_tasks.add_task(
-            dispatch_run,
-            request.app,
-            run_id,
-            body.message,
-            report_ref,
-            scan_ref,
-        )
         logger.info("run_queued run_id=%s", run_id)
+        request.app.state.dispatcher.submit(
+            partial(
+                dispatch_run,
+                request.app,
+                run_id,
+                body.message,
+                report_ref,
+                scan_ref,
+            )
+        )
         return RunAccepted(runId=run_id, status="queued")
 
     @api.get("/v1/runs/{run_id}", response_model=RunView)

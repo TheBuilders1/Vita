@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import logging
+import queue
 import threading
+from collections.abc import Callable
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -36,6 +38,39 @@ class RunSignals:
     def discard(self, run_id: UUID) -> None:
         with self._lock:
             self._events.pop(run_id, None)
+
+
+class RunDispatcher:
+    """Hilos propios para las ejecuciones, que esperan al agente hasta su plazo.
+
+    Con los de FastAPI, unas decenas de ejecuciones dejarían sin hilos al resto
+    de la API, incluido el escaneo que esas mismas ejecuciones necesitan. Son
+    «daemon» para no retrasar el apagado: al arrancar, las ejecuciones
+    interrumpidas se marcan como fallidas.
+    """
+
+    def __init__(self, workers: int = 8) -> None:
+        self._jobs: queue.SimpleQueue[Callable[[], None]] = queue.SimpleQueue()
+        self._workers = workers
+        self._started = False
+        self._lock = threading.Lock()
+
+    def submit(self, job: Callable[[], None]) -> None:
+        with self._lock:
+            if not self._started:
+                self._started = True
+                for _ in range(self._workers):
+                    threading.Thread(target=self._work, daemon=True).start()
+        self._jobs.put(job)
+
+    def _work(self) -> None:
+        while True:
+            job = self._jobs.get()
+            try:
+                job()
+            except Exception:
+                # Sin el texto de la excepción: puede incluir datos del usuario.
+                logger.error("dispatch_worker_error")
 
 
 def build_prompt(
@@ -241,6 +276,7 @@ def report_result(
                         SET scan_status = 'needs_confirmation',
                             proposed_expires_on = %s
                         WHERE id = %s
+                          AND scan_status <> 'confirmed'
                         """,
                         (proposed, row["document_id"]),
                     )
