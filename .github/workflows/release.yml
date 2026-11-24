@@ -1,0 +1,50 @@
+# release-please: a partir de los Conventional Commits mantiene abierto un PR de release con la
+# próxima versión y el CHANGELOG. Al fusionarlo, crea la etiqueta y la release en GitHub.
+name: Publicar versión
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: release-please
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # etiquetas, releases y CHANGELOG
+      pull-requests: write # PR de release
+      actions: write # lanzar los controles sobre el PR de release
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          target-branch: main
+          config-file: .github/release-please-config.json
+          manifest-file: .github/release-please-manifest.json
+
+      - name: Lanzar los controles sobre el PR de release
+        if: steps.release.outputs.prs_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # JSON en crudo: fromJSON() rompe la plantilla si la salida llega vacía
+          PR_JSON: ${{ steps.release.outputs.pr }}
+          REPO: ${{ github.repository }}
+        run: |
+          branch=$(jq -r '.headBranchName // empty' <<<"$PR_JSON" 2>/dev/null || true)
+          # Sin datos del PR en la salida: se busca el PR de release abierto por su etiqueta
+          if [ -z "$branch" ]; then
+            branch=$(gh pr list --repo "$REPO" --base main --label 'autorelease: pending' --state open \
+              --json headRefName --jq '.[0].headRefName // empty')
+          fi
+          if [ -z "$branch" ]; then
+            echo "::error::No se encontró la rama del PR de release; no se lanzan los controles"
+            exit 1
+          fi
+          gh workflow run deploy.yml --repo "$REPO" --ref "$branch"

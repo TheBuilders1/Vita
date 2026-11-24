@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+# Tokens ficticios de la demo, documentados y con «change-me» en el nombre.
+[[allowlists]]
+description = "Tokens de ejemplo"
+regexes = ['''(alba|bruno|carla)-demo-token-change-me''']

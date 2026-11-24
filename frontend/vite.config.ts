@@ -4,15 +4,19 @@ import react from '@vitejs/plugin-react'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 import { offlinePlugin } from './server/offline.ts'
+import { pagesPlugin, publishedSite } from './server/pages.ts'
 import { isAllowedCall, readApiConfig } from './server/apiGuard.ts'
 
 const header = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value)
 
-export default defineConfig(({ command, mode }) => {
+export default defineConfig(({ command, mode, isPreview }) => {
   // Solo al desarrollar: una versión publicada no tiene proxy y no debe ofrecer la lectura de fotos.
-  const api = command === 'serve' && mode !== 'test' ? readApiConfig(loadEnv(mode, fileURLToPath(new URL('.', import.meta.url)), 'VITA_')) : null
+  const api = command === 'serve' && !isPreview && mode !== 'test' ? readApiConfig(loadEnv(mode, fileURLToPath(new URL('.', import.meta.url)), 'VITA_')) : null
+  const site = publishedSite(process.env.SITE_URL)
   return {
-    plugins: [react(), tailwindcss(), offlinePlugin()],
+    base: site.base,
+    // El orden importa: 404.html se emite después de calcular lo que se guarda para abrir sin conexión.
+    plugins: [react(), tailwindcss(), offlinePlugin(), pagesPlugin(site.url)],
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
     build: {
       rolldownOptions: {

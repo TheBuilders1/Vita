@@ -1,4 +1,4 @@
-import * as z from 'zod'
+import * as z from '@/utils/zod'
 import type { ModuleId } from '@/modules/types'
 import { familyInputSchema, memberInputSchema, moduleIdSchema, NEEDS, ROLES, type FamilyInput, type MemberInput, type Need, type Role } from '@/types/family'
 import { ageOn } from '@/utils/dates'

@@ -26,3 +26,4 @@ vita-demo-document.png
 # Notas y caché locales de cada persona
 /reporte.md
 .vite/
+.lighthouseci/

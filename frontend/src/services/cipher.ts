@@ -1,4 +1,4 @@
-import * as z from 'zod'
+import * as z from '@/utils/zod'
 import { base64ToBytes, bytesToBase64 } from '@/utils/base64'
 import { ConflictError } from './errors'
 

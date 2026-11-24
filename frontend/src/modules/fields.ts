@@ -1,4 +1,4 @@
-import * as z from 'zod'
+import * as z from '@/utils/zod'
 import { isIsoDate, isTime } from '@/utils/dates'
 import { isWebLink, tidyLink } from '@/utils/webLinks'
 

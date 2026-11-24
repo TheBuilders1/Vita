@@ -1,7 +1,9 @@
 import { Link } from 'react-router'
+import { useTitle } from '@/hooks/useTitle'
 import { MessagePage } from './MessagePage'
 
 export function NotFoundPage() {
+  useTitle('Esta puerta no existe')
   return (
     <MessagePage title="Esta puerta no existe" action={<Link className="underline underline-offset-4" to="/">Volver al inicio</Link>}>
       La dirección que has abierto no lleva a ninguna habitación.

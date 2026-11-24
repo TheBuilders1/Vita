@@ -1,4 +1,4 @@
-import * as z from 'zod'
+import * as z from '@/utils/zod'
 import { MODULES } from '@/modules/registry'
 import type { Access, ModuleId } from '@/modules/types'
 import { isIsoDate } from '@/utils/dates'

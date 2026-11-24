@@ -1,4 +1,4 @@
-import * as z from 'zod'
+import * as z from '@/utils/zod'
 import { RECORD_TYPES, getRecordType } from '@/modules/registry'
 import { familyInputSchema, memberInputSchema, type Family, type Member } from '@/types/family'
 import { ACCEPTED_TYPES, CHANGE_KINDS, MAX_FILE_BYTES, type FamilyRecord } from '@/types/records'

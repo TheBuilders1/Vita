@@ -1,4 +1,4 @@
-import * as z from 'zod'
+import * as z from '@/utils/zod'
 import { isIsoDate } from '@/utils/dates'
 import { VitaError } from './errors'
 

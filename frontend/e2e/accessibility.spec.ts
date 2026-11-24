@@ -4,7 +4,7 @@ const SCREENS = ['/', '/planta/finance/documents', '/planta/finance/finances', '
 
 for (const path of SCREENS) {
   test(`accesible y sin desbordes: ${path}`, async ({ page }) => {
-    await page.goto(path)
+    await page.goto(`.${path}`)
     await expect(page.getByRole('heading', { level: 1 })).toBeAttached()
     await expectAccessible(page)
     await expectNoOverflow(page)

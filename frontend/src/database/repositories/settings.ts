@@ -1,4 +1,4 @@
-import * as z from 'zod'
+import * as z from '@/utils/zod'
 import type { VitaDb } from '@/database/db'
 import { validationErrorFrom } from '@/services/errors'
 
