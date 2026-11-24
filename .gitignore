@@ -1,3 +1,15 @@
+node_modules/
+dist/
+coverage/
+*.local
+*.log
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.playwright-mcp/
+
+# Backend
 .env
 .venv/
 __pycache__/
@@ -7,5 +19,6 @@ __pycache__/
 *.egg-info/
 openclaw/vita-tools/node_modules/
 openclaw/vita-tools/package-lock.json
-data/
+# Con ancla: sin ella ignoraría también frontend/src/data.
+/data/
 vita-demo-document.png

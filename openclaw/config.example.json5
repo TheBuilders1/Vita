@@ -23,6 +23,9 @@
     },
   },
 
+  // Cada agente tiene una o tres herramientas: sin buscador, el modelo las ve directamente.
+  tools: { toolSearch: false },
+
   agents: {
     ownership: "explicit",
     defaults: {
@@ -38,7 +41,9 @@
       orquestador: {
         workspace: "/absolute/path/to/Vita/openclaw/agents/orquestador",
         tools: {
-          allow: ["sessions_spawn", "sessions_yield", "vita_report_result"],
+          // El hijo nunca tiene más de lo que permite esta lista: sin
+          // vita_scan_document aquí, «documentos» se queda sin herramientas.
+          allow: ["sessions_spawn", "sessions_yield", "vita_report_result", "vita_scan_document"],
         },
         subagents: {
           allowAgents: ["documentos"],

@@ -1,10 +1,33 @@
 # Vita
 
+- [Frontend](#frontend): aplicación web de gestión del hogar. Guarda los datos en el navegador.
+- [Backend](#backend): API de demostración del asistente por hogar.
+
+Hoy son independientes: el frontend todavía no usa la API.
+
+## Frontend
+
+Gestión del hogar en un espacio privado, alrededor de un edificio isométrico de cinco plantas.
+Solo frontend: los datos se guardan en el navegador (IndexedDB) y no se envían a ningún servidor.
+
+> Los datos **no están cifrados**. Se pierden si se borra el almacenamiento del navegador, y los roles
+> simulan permisos dentro de la app: no protegen frente a quien use este dispositivo.
+
+Está en [`frontend/`](frontend/README.md), con su documentación en `frontend/docs/`.
+
+```bash
+cd frontend
+pnpm install
+pnpm dev
+```
+
+## Backend
+
 Backend de demostración para un asistente personal por hogar. El proyecto enseña dos flujos: delegar una tarea a agentes de OpenClaw y analizar una imagen privada con OCR local para proponer una fecha de caducidad. El usuario debe confirmar la fecha antes de que Vita persista un recordatorio.
 
 Está pensado para una demo local del hackathon, ejecutada desde `curl`; no tiene frontend, calendario integrado ni entrega de notificaciones. Todas las personas, imágenes y fechas de ejemplo son ficticias. **No uses documentos reales ni publiques la API o el Gateway de OpenClaw.**
 
-## Funcionalidad
+### Funcionalidad
 
 - Autenticación local mediante tokens de demostración asociados a usuarios sembrados.
 - Comprobación de pertenencia al hogar y propiedad de ejecuciones y documentos.
@@ -14,7 +37,7 @@ Está pensado para una demo local del hackathon, ejecutada desde `curl`; no tien
 - Confirmación o corrección explícita de la fecha antes de crear un recordatorio persistido en PostgreSQL.
 - Pruebas unitarias para validación, OCR, cliente OpenClaw, esquemas y cálculo horario.
 
-## Arquitectura
+### Arquitectura
 
 ```text
 Cliente (curl)
@@ -29,7 +52,7 @@ Cliente (curl)
 
 OpenClaw se encarga de interpretar y delegar. No accede directamente a PostgreSQL ni al volumen de imágenes. La API es la autoridad para permisos, resultados, estados y escrituras; el texto final de un agente no se considera prueba de que una operación haya terminado.
 
-### Componentes
+#### Componentes
 
 | Ubicación | Responsabilidad |
 | --- | --- |
@@ -45,9 +68,9 @@ OpenClaw se encarga de interpretar y delegar. No accede directamente a PostgreSQ
 | `migrations/` | Esquema relacional y datos ficticios iniciales. |
 | `openclaw/agents/` | Instrucciones y restricciones de los agentes `orquestador` y `documentos`. |
 | `openclaw/vita-tools/` | Plugin local que expone `vita_scan_document` y `vita_report_result`. |
-| `tests/` | Pruebas unitarias de los módulos principales. |
+| `tests/backend/` | Pruebas unitarias y de integración. Los del frontend están en `frontend/tests/`. |
 
-### Datos
+#### Datos
 
 PostgreSQL usa una sola instancia y dos esquemas con propietarios separados:
 
@@ -56,7 +79,7 @@ PostgreSQL usa una sola instancia y dos esquemas con propietarios separados:
 
 Las tablas de producto relacionan los datos con un hogar y su propietario. Los metadatos de imágenes quedan en PostgreSQL; el archivo se guarda bajo una clave aleatoria en el volumen privado. No se almacena el texto OCR bruto. La fecha detectada se conserva como propuesta y solo pasa a confirmada cuando el usuario confirma.
 
-## Requisitos
+### Requisitos
 
 - Linux para el `compose.yaml` incluido, que usa `network_mode: host` para permitir que la API en contenedor alcance un Gateway que escucha en el loopback del host.
 - Docker Engine y Docker Compose.
@@ -66,9 +89,9 @@ Las tablas de producto relacionan los datos con un hogar y su propietario. Los m
 
 El Dockerfile instala Tesseract y los datos de idioma español. En Docker Desktop, la configuración de red incluida no es directamente equivalente: ejecuta la API en el host o configura una red privada y un bind restringido antes de cambiar las URLs.
 
-## Puesta en marcha local
+### Puesta en marcha local
 
-### 1. Preparar las variables
+#### 1. Preparar las variables
 
 Desde la raíz del repositorio:
 
@@ -81,7 +104,7 @@ Edita `.env` y reemplaza las contraseñas y tokens de ejemplo. Para las contrase
 
 `VITA_DEMO_TOKENS` es un objeto JSON cuya clave es el Bearer token y cuyo valor es el UUID del usuario sembrado. Si cambias los tokens, actualiza también los encabezados de los ejemplos de esta guía. Los valores de `.env.example` solo sirven para desarrollo local.
 
-### 2. Configurar OpenClaw
+#### 2. Configurar OpenClaw
 
 Combina [`openclaw/config.example.json5`](openclaw/config.example.json5) con tu configuración existente; reemplaza `/absolute/path/to/Vita` por la ruta absoluta de este repositorio. **No sobrescribas tu `openclaw.json`.** El ejemplo configura el Gateway con bind loopback, autenticación por token, el plugin y dos agentes con permisos limitados.
 
@@ -105,12 +128,12 @@ export VITA_API_URL='http://127.0.0.1:8000'
 
 Verifica que los agentes tengan cargados sus `AGENTS.md` y que sus herramientas estén restringidas como se indica en el ejemplo:
 
-- `orquestador`: `sessions_spawn`, `sessions_yield` y `vita_report_result`; solo puede delegar en `documentos`.
+- `orquestador`: `sessions_spawn`, `sessions_yield` y `vita_report_result`; solo puede delegar en `documentos`. También lista `vita_scan_document`, porque un subagente nunca tiene más herramientas que quien lo crea; sus instrucciones le prohíben usarla.
 - `documentos`: solo `vita_scan_document`; no puede delegar, acceder a archivos directamente, ejecutar comandos ni usar navegador o mensajería.
 
 Si el Gateway corre en otro contenedor, no expongas el puerto en la LAN: configura una red privada compartida y restringe el acceso antes de cambiar `OPENCLAW_BASE_URL` y `VITA_API_URL`.
 
-### 3. Arrancar la API y PostgreSQL
+#### 3. Arrancar la API y PostgreSQL
 
 ```bash
 docker compose up --build
@@ -125,7 +148,7 @@ Compose inicializa PostgreSQL, aplica las migraciones y arranca Uvicorn. Por def
 
 La primera inicialización de PostgreSQL crea roles y hogares ficticios. Cambiar las contraseñas del `.env` no rota las credenciales de un volumen ya inicializado. `docker compose down` conserva los volúmenes; antes de borrar datos, exporta o conserva lo que necesites.
 
-## API de demostración
+### API de demostración
 
 Las rutas de usuario usan `Authorization: Bearer <token>`. El cliente no puede enviar `userId`: el servidor lo obtiene del token. Los campos JSON usan nombres camelCase. La API oculta ejecuciones ajenas respondiendo `404`, incluso si el usuario pertenece al mismo hogar.
 
@@ -139,7 +162,7 @@ Las rutas de usuario usan `Authorization: Bearer <token>`. El cliente no puede e
 
 Los endpoints `/v1/internal/scan` y `/v1/internal/report-result` son exclusivamente para el plugin. Se autentican con referencias aleatorias de vida limitada, no con tokens de usuario, y no forman parte del contrato para clientes.
 
-## Hito 1: delegación y resultado estructurado
+### Hito 1: delegación y resultado estructurado
 
 Los hogares y usuarios ficticios se insertan en la migración inicial:
 
@@ -174,9 +197,9 @@ Los estados son `queued`, `running`, `completed`, `failed` y `timed_out`. En el 
 
 Prueba el aislamiento repitiendo el `GET` con el token de Bruno o Carla: la ejecución de Alba debe responder `404`.
 
-## Hito 2: imagen, OCR y confirmación
+### Hito 2: imagen, OCR y confirmación
 
-### Generar y cargar una imagen ficticia
+#### Generar y cargar una imagen ficticia
 
 El script genera `vita-demo-document.png` en el directorio actual. La imagen está marcada como prueba y no contiene datos personales:
 
@@ -208,7 +231,7 @@ curl -i http://127.0.0.1:8000/v1/runs \
 
 El orquestador delega en `documentos`; el plugin pide al backend escanear el archivo con Tesseract local. Solo el estado y una fecha candidata vuelven al agente. El OCR bruto no se guarda ni se envía al modelo. El resultado puede ser `date_found`, `date_missing` o `date_ambiguous`.
 
-### Confirmar la fecha y guardar el recordatorio
+#### Confirmar la fecha y guardar el recordatorio
 
 Consulta el `runId` hasta que tenga estado `completed`. La fecha del resultado es una propuesta: el usuario puede confirmarla o corregirla. Si no se encontró una fecha o el resultado es ambiguo, también puede introducirla manualmente.
 
@@ -223,7 +246,7 @@ La respuesta incluye `reminderId` y `scheduledAt`. El aviso se calcula para las 
 
 **El recordatorio queda guardado, no enviado.** Este proyecto no incluye un worker de notificaciones ni una integración de calendario.
 
-## Seguridad y privacidad de la demo
+### Seguridad y privacidad de la demo
 
 - Mantén la API y el Gateway en loopback o en una red privada. El token del Gateway es una credencial de operador y no debe compartirse con clientes.
 - Los tokens de usuario son una simplificación local; no hay registro, OAuth ni gestión de contraseñas.
@@ -234,7 +257,7 @@ La respuesta incluye `reminderId` y `scheduledAt`. El aviso se calcula para las 
 - OpenClaw conserva sus sesiones según la política de retención configurada localmente. Revisa esa configuración antes de cualquier uso con datos reales.
 - No uses documentos de identidad reales para la demo. Antes de un piloto real harían falta, entre otras cosas, autenticación adecuada, aislamiento de usuarios y Gateway, cifrado, borrado y retención definidos, y una vía fiable para procesar trabajos y entregar avisos.
 
-## Límites operativos y fuera de alcance
+### Límites operativos y fuera de alcance
 
 - La API está diseñada para **una sola instancia/proceso**. Usa tareas en segundo plano dentro del proceso, no una cola persistente.
 - Al reiniciar la API, las ejecuciones que sigan en `queued` o `running` se marcan `failed` con `interrupted`; no se reanudan ni se vuelven a delegar automáticamente.
@@ -242,7 +265,7 @@ La respuesta incluye `reminderId` y `scheduledAt`. El aviso se calcula para las 
 - No hay frontend, calendario real, envío de avisos, sistema de registro ni integración con documentos reales.
 - El Gateway y la API no son una frontera de seguridad adecuada para hogares mutuamente no confiables sin aislamiento adicional.
 
-## Pruebas
+### Pruebas
 
 Desde la raíz del repositorio, crea y activa un entorno virtual con Python 3.10 o superior. En Linux puede usarse `python3` para crear el entorno; los comandos siguientes usan el `python` del entorno ya activado:
 
@@ -253,9 +276,16 @@ python -m pip install -e '.[dev]'
 python -m pytest
 ```
 
-La suite automatizada actual prueba validación de imágenes, selección conservadora de fechas OCR, manejo del cliente OpenClaw, autenticación/esquemas y cálculo horario del recordatorio. No levanta PostgreSQL ni OpenClaw. Para recorrer la demo completa manualmente hacen falta PostgreSQL, Tesseract y un Gateway privado con el plugin habilitado.
+Sin más configuración se ejecutan las pruebas unitarias: imágenes, fechas OCR, cliente OpenClaw, autenticación, esquemas y cálculo horario. Las de integración (`test_api.py`) levantan la API sobre PostgreSQL con un Gateway y un OCR simulados; se omiten si faltan estas variables:
 
-## Configuración de OpenClaw y variables
+```bash
+export VITA_TEST_DATABASE_URL='postgresql://vita_api:CONTRASEÑA@127.0.0.1:PUERTO/vita_test'
+export VITA_TEST_MIGRATION_DATABASE_URL='postgresql://vita_migrator:CONTRASEÑA@127.0.0.1:PUERTO/vita_test'
+```
+
+La base debe terminar en `_test` porque **se vacía**, y haberse preparado con `database/init/01-roles.sh`. OpenClaw real no se prueba: para recorrer la demo completa hacen falta PostgreSQL, Tesseract y un Gateway privado con el plugin habilitado.
+
+### Configuración de OpenClaw y variables
 
 El archivo [`openclaw/config.example.json5`](openclaw/config.example.json5) contiene el ejemplo de configuración del Gateway, los agentes y los permisos del plugin. El contrato de trabajo y las decisiones de arquitectura están ampliados en [`vita-backend.md`](vita-backend.md).
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import subprocess
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 
@@ -11,8 +11,16 @@ _EXPIRY_LABEL = re.compile(
     r"\b(?:caducidad|validez|v[áa]lido\s+hasta|valid\s+until|expiry|expiration|expires)\b",
     re.IGNORECASE,
 )
+# Con espacios se exige el año completo: «31 12 30» podría ser cualquier número.
+_SEPARATOR = r"(?:\s*[-/.]\s*|\s+)"
 _DATE_TOKEN = re.compile(
-    r"(?<!\d)(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4})(?!\d)"
+    rf"(?<!\d)(?:\d{{4}}{_SEPARATOR}\d{{1,2}}{_SEPARATOR}\d{{1,2}}"
+    rf"|\d{{1,2}}{_SEPARATOR}\d{{1,2}}{_SEPARATOR}\d{{4}}"
+    r"|\d{1,2}[-/.]\d{1,2}[-/.]\d{2})(?!\d)"
+)
+_OTHER_LABEL = re.compile(
+    r"nacimiento|birth|expedici[óo]n|emisi[óo]n|issue",
+    re.IGNORECASE,
 )
 
 
@@ -33,24 +41,40 @@ class OcrUnavailable(RuntimeError):
 
 
 def _parse_date(value: str) -> date | None:
+    first, second, third = re.findall(r"\d+", value)
+    if len(first) == 4:
+        year, month, day = first, second, third
+    else:
+        day, month, year = first, second, third
+    if len(year) == 2:
+        year = f"20{year}"
     try:
-        parts = re.split(r"[-/.]", value)
-        if len(parts[0]) == 4:
-            return date.fromisoformat(
-                f"{int(parts[0]):04d}-{int(parts[1]):02d}-{int(parts[2]):02d}"
-            )
-        return datetime.strptime(value.replace(".", "/").replace("-", "/"), "%d/%m/%Y").date()
-    except (ValueError, IndexError):
+        return date(int(year), int(month), int(day))
+    except ValueError:
         return None
+
+
+def _date_tokens(lines: list[str], index: int) -> list[str]:
+    """Fechas de la etiqueta o, si va sola, de la línea que tiene debajo."""
+    label = lines[index]
+    tokens = _DATE_TOKEN.findall(label)
+    if tokens or _OTHER_LABEL.search(label):
+        return tokens
+
+    following = lines[index + 1] if index + 1 < len(lines) else ""
+    if re.search(r"[^\W\d_]", following):
+        return []
+    return _DATE_TOKEN.findall(following)
 
 
 def extract_expiry_date(ocr_text: str) -> ScanResult:
     candidates: set[date] = set()
-    for line in ocr_text.splitlines():
+    lines = [line for line in ocr_text.splitlines() if line.strip()]
+    for index, line in enumerate(lines):
         if not _EXPIRY_LABEL.search(line):
             continue
-        for match in _DATE_TOKEN.finditer(line):
-            value = _parse_date(match.group(0))
+        for token in _date_tokens(lines, index):
+            value = _parse_date(token)
             if value is not None:
                 candidates.add(value)
 
