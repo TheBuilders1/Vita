@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 from fastapi import (
     Depends,
@@ -75,13 +76,17 @@ def _confirm_response(
     run_id: UUID,
     document_id: UUID,
     reminder: dict,
+    timezone_name: str,
 ) -> ConfirmationAccepted:
     return ConfirmationAccepted(
         reminderId=reminder["id"],
         runId=run_id,
         documentId=document_id,
         expiresOn=reminder["expires_on"],
-        scheduledAt=reminder["notify_at"].isoformat(),
+        # PostgreSQL lo devuelve en la zona del servidor, no en la del hogar.
+        scheduledAt=reminder["notify_at"]
+        .astimezone(ZoneInfo(timezone_name))
+        .isoformat(),
         status="scheduled",
     )
 
@@ -331,6 +336,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if not document:
                 raise HTTPException(status_code=404, detail="document_not_found")
 
+            household = conn.execute(
+                "SELECT timezone FROM gestion.households WHERE id = %s",
+                (run["household_id"],),
+            ).fetchone()
             existing = conn.execute(
                 """
                 SELECT id, expires_on, days_before, notify_at
@@ -348,7 +357,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                         status_code=409,
                         detail="confirmation_conflict",
                     )
-                return _confirm_response(run_id, document["id"], existing)
+                return _confirm_response(
+                    run_id, document["id"], existing, household["timezone"]
+                )
 
             if document["scan_status"] != "needs_confirmation":
                 raise HTTPException(status_code=409, detail="document_not_confirmable")
@@ -361,10 +372,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             }:
                 raise HTTPException(status_code=409, detail="run_not_confirmable")
 
-            household = conn.execute(
-                "SELECT timezone FROM gestion.households WHERE id = %s",
-                (run["household_id"],),
-            ).fetchone()
             try:
                 notify_at = scheduled_reminder_at(
                     expires_on,
