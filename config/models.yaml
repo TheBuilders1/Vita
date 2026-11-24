@@ -1,0 +1,23 @@
+# Backends de modelos disponibles en spark-holux (API compatible con OpenAI)
+backends:
+  vllm:
+    base_url: http://192.168.1.121:8000/v1
+    models:
+      - qwen3.8:27b
+      - qwen3.8:27b-juez
+  ollama:
+    base_url: http://192.168.1.121:11434/v1
+    models:
+      - gemma4:31b
+      - gemma4:e4b
+      - qwen3.5:9b
+      - qwen3.5:4b
+      - qwen3.5:2b
+      - granite4.2:8b
+      - qwen2.5:72b-instruct-q6_K
+
+# Modelo por defecto para cada papel; se puede sobrescribir por agente
+defaults:
+  orchestrator: vllm/qwen3.8:27b
+  agent: ollama/qwen3.5:9b
+  judge: vllm/qwen3.8:27b-juez

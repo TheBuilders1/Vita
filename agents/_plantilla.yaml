@@ -1,0 +1,10 @@
+# Plantilla de agente. Copiar como agents/<nombre>.yaml
+name: ejemplo
+description: Qué sabe hacer este agente, en una frase. El orquestador la usa para elegirlo.
+model: ollama/qwen3.5:9b     # backend/modelo, ver config/models.yaml
+system_prompt: |
+  Eres un agente especializado en ...
+tools: []                     # herramientas que puede usar
+limits:
+  max_steps: 10
+  timeout_s: 120
