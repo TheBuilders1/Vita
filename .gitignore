@@ -8,3 +8,17 @@ coverage/
 !.vscode/extensions.json
 .idea/
 .playwright-mcp/
+
+# Backend
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.py[cod]
+*.egg-info/
+openclaw/vita-tools/node_modules/
+openclaw/vita-tools/package-lock.json
+# Con ancla: sin ella ignoraría también src/data del frontend.
+/data/
+vita-demo-document.png
