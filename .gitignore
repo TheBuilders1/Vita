@@ -19,6 +19,6 @@ __pycache__/
 *.egg-info/
 openclaw/vita-tools/node_modules/
 openclaw/vita-tools/package-lock.json
-# Con ancla: sin ella ignoraría también src/data del frontend.
+# Con ancla: sin ella ignoraría también frontend/src/data.
 /data/
 vita-demo-document.png

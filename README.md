@@ -13,28 +13,13 @@ Solo frontend: los datos se guardan en el navegador (IndexedDB) y no se envían 
 > Los datos **no están cifrados**. Se pierden si se borra el almacenamiento del navegador, y los roles
 > simulan permisos dentro de la app: no protegen frente a quien use este dispositivo.
 
-### Desarrollo
-
-Requiere Node ≥ 22.22 y pnpm 12.
+Está en [`frontend/`](frontend/README.md), con su documentación en `frontend/docs/`.
 
 ```bash
+cd frontend
 pnpm install
-pnpm dev      # servidor de desarrollo
-pnpm check    # linter, tipos, tests y build
+pnpm dev
 ```
-
-### Estado
-
-| Fase | Estado |
-|---|---|
-| 1. Arquitectura y modelo de datos | Hecha |
-| 2. Sistema visual | Hecha |
-| 3. Edificio isométrico | Hecha |
-| 4. Interfaz | Hecha |
-| 5. Funcionalidad completa y demostración | Hecha |
-| 6. Refinamiento | Pendiente |
-
-Detalles en [docs/arquitectura.md](docs/arquitectura.md). Usabilidad y accesibilidad, en [docs/usabilidad.md](docs/usabilidad.md).
 
 ## Backend
 
@@ -83,7 +68,7 @@ OpenClaw se encarga de interpretar y delegar. No accede directamente a PostgreSQ
 | `migrations/` | Esquema relacional y datos ficticios iniciales. |
 | `openclaw/agents/` | Instrucciones y restricciones de los agentes `orquestador` y `documentos`. |
 | `openclaw/vita-tools/` | Plugin local que expone `vita_scan_document` y `vita_report_result`. |
-| `tests/backend/` | Pruebas unitarias y de integración. El resto de `tests/` es del frontend. |
+| `tests/backend/` | Pruebas unitarias y de integración. Los del frontend están en `frontend/tests/`. |
 
 #### Datos
 

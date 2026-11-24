@@ -22,8 +22,7 @@
   },
   "ignorePatterns": [
     "dist",
-    "node_modules",
-    "openclaw"
+    "node_modules"
   ],
   "overrides": [
     {
