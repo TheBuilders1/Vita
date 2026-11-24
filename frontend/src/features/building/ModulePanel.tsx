@@ -14,11 +14,17 @@ import { useTips } from '@/hooks/useTips'
 import type { Floor } from '@/modules/floors'
 import type { ModuleDef } from '@/modules/types'
 import { accessTo, canManage } from '@/services/permissions'
+import { revealIfHiddenBelow } from '@/utils/reveal'
+import { AddBar, MAIN_ADD_ID } from './AddBar'
 
 export function ModulePanel({ module, floor, enabled }: { module: ModuleDef; floor: Floor; enabled: boolean }) {
   const heading = useRef<HTMLHeadingElement>(null)
   // Al entrar en una habitación, el foco y el lector de pantalla van a su nombre.
-  useEffect(() => { heading.current?.focus({ preventScroll: true }) }, [module.id])
+  useEffect(() => {
+    if (!heading.current) return
+    heading.current.focus({ preventScroll: true })
+    revealIfHiddenBelow(document.getElementById(MAIN_ADD_ID) ?? heading.current)
+  }, [module.id])
   return (
     <section aria-labelledby="module-title" className="bg-crema p-4 shadow-panel sm:p-6">
       <BackLink to={`/planta/${floor.id}`}>{`Volver a ${floor.name}`}</BackLink>
@@ -26,7 +32,8 @@ export function ModulePanel({ module, floor, enabled }: { module: ModuleDef; flo
         <ModuleIcon id={module.id} className="size-8" />
         <h2 ref={heading} id="module-title" tabIndex={-1} className="text-2xl font-bold outline-none">{module.name}</h2>
       </div>
-      <p className="mt-1">{module.description}</p>
+      {enabled && <AddBar moduleId={module.id} />}
+      <p className="mt-3">{module.description}</p>
       {enabled ? <Content key={module.id} module={module} /> : <Closed module={module} />}
     </section>
   )

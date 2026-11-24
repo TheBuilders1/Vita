@@ -100,3 +100,26 @@ test('lo que se repite cada día se distingue, para que no tape lo demás', () =
   const event = rec('event', 'planner', { title: 'Cena', date: '2026-11-24' })
   expect(agenda([plan, event], '2026-11-24', '2026-11-24').map((i) => [i.title, i.routine])).toEqual([['Cena', undefined], ['A', true]])
 })
+
+describe('tareas con repetición en el calendario', () => {
+  test('solo la fecha pendiente puede completarse y todas conservan la hora', () => {
+    const task = rec('task', 'planner', { title: 'Regar', dueDate: '2026-11-20', repeat: 'daily', until: '2026-11-25', time: '09:30' })
+    const items = buildAgenda({ records: [task], members: [], from: '2026-11-19', to: '2026-11-26', today: '2026-11-24' })
+    expect(items.map(({ date, time, done, taskPreview }) => [date, time, done, taskPreview])).toEqual([
+      ['2026-11-20', '09:30', false, undefined],
+      ['2026-11-24', '09:30', undefined, true],
+      ['2026-11-25', '09:30', undefined, true],
+    ])
+  })
+
+  test('la última fecha hecha sigue en el calendario sin repeticiones nuevas', () => {
+    const task = rec('task', 'planner', { title: 'Regar', dueDate: '2026-11-24', repeat: 'daily', done: true })
+    expect(agenda([task], '2026-11-24', '2026-11-30').map(({ date, done }) => [date, done])).toEqual([['2026-11-24', true]])
+  })
+
+  test('si había pasado al 28 de febrero, el calendario vuelve a mostrar el 31', () => {
+    const task = rec('task', 'planner', { title: 'Revisar', dueDate: '2027-02-28', repeat: 'monthly', repeatAnchor: '2027-01-31' })
+    const items = buildAgenda({ records: [task], members: [], from: '2027-02-01', to: '2027-03-31', today: '2027-02-01' })
+    expect(items.map(({ date }) => date)).toEqual(['2027-02-28', '2027-03-31'])
+  })
+})

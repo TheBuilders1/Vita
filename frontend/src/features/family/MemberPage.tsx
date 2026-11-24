@@ -4,6 +4,7 @@ import { Navigate, useNavigate, useParams } from 'react-router'
 import { useHome } from '@/app/providers/home'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { BackLink } from '@/components/navigation/BackLink'
+import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/Dialog'
 import { Panel } from '@/components/ui/Panel'
@@ -22,7 +23,7 @@ const back = <BackLink to="/hogar">Volver a mi hogar</BackLink>
 export function NewMemberPage() {
   const { actor } = useHome()
   const navigate = useNavigate()
-  useTitle('Añadir integrante')
+  useTitle('Añadir persona')
   if (!canManage(actor, 'family')) return <Navigate to="/hogar" replace />
   const save = async (input: MemberInput) => {
     const member = await repositories.family.addMember(actor.id, input)
@@ -31,8 +32,8 @@ export function NewMemberPage() {
   }
   return (
     <div className="mx-auto grid w-full max-w-3xl grid-cols-1 gap-6">
-      <PageHeader title="Añadir integrante" back={back} />
-      <Panel><ProfileForm scope="full" submitLabel="Añadir integrante" onSave={save} /></Panel>
+      <PageHeader title="Añadir persona" back={back} />
+      <Panel><ProfileForm scope="full" submitLabel="Añadir persona" onSave={save} /></Panel>
     </div>
   )
 }
@@ -46,14 +47,16 @@ export function MemberPage() {
   const manages = canManage(actor, 'family')
   const own = member.id === actor.id
   const save = async (input: MemberInput) => {
-    const { name, birthDate, relationship } = input
-    await repositories.family.updateMember(actor.id, member.id, manages ? input : { name, birthDate, relationship })
+    const { name, birthDate, relationship, photo } = input
+    // Lo que puede ver se cambia en «Qué puede ver»: enviarlo desde aquí desharía lo recién elegido allí.
+    const { moduleAccess: _elsewhere, ...profile } = input
+    await repositories.family.updateMember(actor.id, member.id, manages ? profile : { name, birthDate, relationship, photo })
     toastStore.getState().show('Perfil guardado')
   }
   return (
     <div className="mx-auto grid w-full max-w-3xl grid-cols-1 gap-6">
       <PageHeader title={member.name} back={back} />
-      <Panel title="Perfil">
+      <Panel title="Perfil" action={!manages && !own && <Avatar name={member.name} photo={member.photo} />}>
         <ProfileForm key={member.id} member={member} scope={manages ? 'full' : own ? 'own' : 'none'} submitLabel="Guardar perfil" onSave={save} />
       </Panel>
       {manages && member.role !== 'master' && <Panel title="Qué puede ver"><AccessEditor member={member} /></Panel>}

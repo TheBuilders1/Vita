@@ -1,0 +1,9 @@
+{
+  "name": "vita",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -C frontend dev",
+    "build": "pnpm -C frontend build",
+    "check": "pnpm -C frontend check"
+  }
+}

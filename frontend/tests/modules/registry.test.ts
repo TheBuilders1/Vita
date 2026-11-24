@@ -143,3 +143,29 @@ describe('reglas de negocio de los formularios', () => {
     expect(schema.safeParse({ ...base, recipe: 'r1' }).success).toBe(true)
   })
 })
+
+describe('hora y repetición de tareas', () => {
+  const schema = getRecordType('task').schema
+  const base = { title: 'Regar' }
+
+  test.each([
+    [{ time: '09:30' }, 'dueDate', 'Indica «Para cuándo» para poner una hora o repetir la tarea'],
+    [{ repeat: 'daily' }, 'dueDate', 'Indica «Para cuándo» para poner una hora o repetir la tarea'],
+    [{ dueDate: '2026-11-24', repeat: 'none', until: '2026-11-25' }, 'until', 'Elige cómo se repite antes de poner una fecha de fin'],
+    [{ dueDate: '2026-11-24', until: '2026-11-25' }, 'until', 'Elige cómo se repite antes de poner una fecha de fin'],
+    [{ dueDate: '2026-11-24', repeat: 'weekly', until: '2026-11-23' }, 'until', 'La repetición no puede acabar antes de «Para cuándo»'],
+    [{ dueDate: '2026-11-24', time: '24:00' }, 'time', 'La hora no es válida'],
+  ])('indica cómo corregir %j', (data, field, message) => {
+    const result = schema.safeParse({ ...base, ...data })
+    expect(result.error?.issues).toContainEqual(expect.objectContaining({ path: [field], message }))
+  })
+
+  test.each(['daily', 'weekly', 'monthly', 'yearly'])('acepta %s con hora y con fin el mismo día', (repeat) => {
+    const data = { ...base, dueDate: '2026-11-24', repeat, time: '09:30', until: '2026-11-24' }
+    expect(schema.parse(data)).toMatchObject(data)
+  })
+
+  test('se puede elegir que no se repita aunque no tenga fecha', () => {
+    expect(schema.parse({ ...base, repeat: 'none' })).toMatchObject({ ...base, repeat: 'none' })
+  })
+})

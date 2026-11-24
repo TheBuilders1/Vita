@@ -30,7 +30,7 @@ const shopping = defineModule({
   access: { member: 'write', vulnerable: 'write' },
   recordTypes: [
     defineRecordType({
-      id: 'shoppingList', name: 'Lista', plural: 'Listas', titleField: 'name',
+      id: 'shoppingList', name: 'Lista de compra', plural: 'Listas de compra', titleField: 'name',
       fields: {
         name: { kind: 'text', label: 'Nombre de la lista', required: true },
         budget: { kind: 'money', label: 'Presupuesto' },
@@ -142,6 +142,7 @@ const album = defineModule({
         date: { kind: 'date', label: 'Fecha', required: true },
         members: { kind: 'members', label: 'Quién aparece' },
         files: { kind: 'files', label: 'Fotos y archivos' },
+        links: { kind: 'links', label: 'Enlaces' },
         story: { kind: 'textarea', label: 'Historia' },
       },
     }),

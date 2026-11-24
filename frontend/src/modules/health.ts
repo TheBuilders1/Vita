@@ -26,6 +26,7 @@ const healthRecord = defineModule({
         active: { kind: 'boolean', label: 'Sigue activo' },
         notes: { kind: 'textarea', label: 'Notas' },
         files: { kind: 'files', label: 'Informes' },
+        links: { kind: 'links', label: 'Enlaces' },
       },
     }),
     defineRecordType({
@@ -105,7 +106,7 @@ const care = defineModule({
   description: 'Rutinas de cuidado, ayudas técnicas e información para cuidadores.',
   recordTypes: [
     defineRecordType({
-      id: 'careNeed', name: 'Necesidad', plural: 'Necesidades', titleField: 'title', visibility: RESTRICTED,
+      id: 'careNeed', name: 'Necesidad de cuidado', plural: 'Necesidades de cuidado', titleField: 'title', visibility: RESTRICTED,
       fields: {
         member: { kind: 'member', label: 'Persona', required: true },
         title: { kind: 'text', label: 'Necesidad', required: true },
@@ -113,6 +114,7 @@ const care = defineModule({
         reviewDate: { kind: 'date', label: 'Próxima revisión' },
         details: { kind: 'textarea', label: 'Detalles' },
         files: { kind: 'files', label: 'Archivos' },
+        links: { kind: 'links', label: 'Enlaces' },
       },
       agenda: [{ dateField: 'reviewDate', category: 'reminder', label: 'Revisar' }],
     }),

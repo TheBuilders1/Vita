@@ -12,7 +12,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true
     db.open()
-      .then(() => Promise.all([settingsStore.getState().load(), repositories.files.purgeAbandoned()]))
+      .then(() => Promise.all([settingsStore.getState().load(), repositories.files.purgeAbandoned(), repositories.trash.purge()]))
       .then(() => { if (active) setStatus('ready') })
       .catch((error: unknown) => {
         console.error('No se ha podido abrir IndexedDB', error)
@@ -20,6 +20,15 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
       })
     return () => { active = false }
   }, [])
+
+  // Vita puede quedarse abierta días: lo caducado se borra también entonces.
+  useEffect(() => {
+    if (status !== 'ready') return
+    const purge = () => { if (document.visibilityState === 'visible') repositories.trash.purge().catch((e: unknown) => console.error('No se ha podido limpiar la papelera', e)) }
+    const timer = setInterval(purge, 60 * 60 * 1000)
+    document.addEventListener('visibilitychange', purge)
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', purge) }
+  }, [status])
 
   if (status === 'ready') return children
   if (status === 'opening') return <output className="block p-8">Abriendo Vita…</output>

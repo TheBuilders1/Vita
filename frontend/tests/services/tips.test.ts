@@ -15,6 +15,20 @@ const ids = (extra: Partial<TipQuery>) => buildTips(query(extra)).map((t) => t.i
 test('una casa al día no recibe consejos', () => expect(buildTips(query())).toEqual([]))
 
 describe('reglas', () => {
+  test('al crecer el hogar se proponen las habitaciones que faltan, con su motivo', () => {
+    const open = MODULES.map((m) => m.id).filter((id) => id !== 'school' && id !== 'kidsMoney')
+    const tip = buildTips(query({ members: [adult, kid], enabled: open })).find((t) => t.id.startsWith('rooms:'))
+    expect(tip).toMatchObject({ id: 'rooms:kidsMoney,school', moduleId: 'planner', link: '/ajustes#habitaciones' })
+    expect(tip?.text).toContain('menores')
+    expect(ids({ members: [adult, kid], enabled: open, dismissed: ['rooms:kidsMoney,school'] })).not.toContain('rooms')
+  })
+  test('va el primero: la portada solo enseña tres', () => {
+    const open = MODULES.map((m) => m.id).filter((id) => id !== 'school')
+    expect(buildTips(query({ records: [], members: [adult, kid], enabled: open, lastBackup: null }))[0]?.id).toBe('rooms:school')
+  })
+  test('no insiste con las habitaciones generales que se hayan cerrado', () => {
+    expect(ids({ enabled: MODULES.map((m) => m.id).filter((id) => id !== 'album') })).not.toContain('rooms')
+  })
   test('revisión dental infantil: si hace más de un año y no hay otra prevista', () => {
     expect(ids({ members: [adult, kid] })).toContain('dental')
     const visit = (data: object) => rec('dentalVisit', 'dental', { member: 'leo', title: 'x', kind: 'checkup', ...data })
@@ -36,8 +50,8 @@ describe('reglas', () => {
   test('presupuesto casi agotado', () => {
     const budget = rec('budget', 'finances', { category: 'food', limit: 1000 })
     const spend = (amount: number) => rec('transaction', 'finances', { kind: 'expense', concept: 'x', category: 'food', amount, date: '2026-11-02' })
-    expect(ids({ records: [contact, budget, spend(900)] })).toContain('budget')
-    expect(ids({ records: [contact, budget, spend(890)] })).not.toContain('budget')
+    expect(ids({ records: [contact, budget, spend(800)] })).toContain('budget')
+    expect(ids({ records: [contact, budget, spend(790)] })).not.toContain('budget')
   })
   test('medicación de ayer sin anotar', () => {
     const plan = rec('medicationPlan', 'medication', { member: 'ana', name: 'A', dose: '1', times: ['09:00'], weekdays: [], startDate: '2026-11-01' })

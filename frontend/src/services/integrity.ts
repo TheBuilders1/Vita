@@ -19,6 +19,10 @@ export const referencesOf = (typeId: string, data: RecordData) =>
   fieldsOf(typeId).flatMap(([name, field]) =>
     field.kind === 'record' && data[name] !== undefined ? [{ name, refType: field.refType, id: String(data[name]) }] : [])
 
+/** Una toma o una aportación son de la misma persona que su medicamento u objetivo. */
+export const isOfAnother = (data: RecordData, target: FamilyRecord) =>
+  data.member !== undefined && target.data.member !== undefined && data.member !== target.data.member
+
 export interface RemovalPlan { removeIds: string[]; updates: FamilyRecord[] }
 
 /** Quita un id de los campos indicados. Devuelve null si el registro deja de ser válido. */
@@ -83,3 +87,16 @@ export function planRemoval(records: readonly FamilyRecord[], { recordId, member
 
   return { removeIds: [...removed], updates: [...current.values()].filter((r) => original.get(r.id) !== r) }
 }
+
+/** Referencias de registros que se quedan hacia los que se borran. */
+export function lostLinks(records: readonly FamilyRecord[], plan: RemovalPlan): { recordId: string; field: string; target: string }[] {
+  const removed = new Set(plan.removeIds)
+  return records.filter((r) => !removed.has(r.id))
+    .flatMap((r) => referencesOf(r.typeId, r.data).filter((ref) => removed.has(ref.id)).map((ref) => ({ recordId: r.id, field: ref.name, target: ref.id })))
+}
+
+export const brokenReferences = (record: FamilyRecord, usable: ReadonlyMap<string, FamilyRecord>) =>
+  referencesOf(record.typeId, record.data).filter((ref) => {
+    const target = usable.get(ref.id)
+    return target?.typeId !== ref.refType || isOfAnother(record.data, target)
+  }).map((ref) => ref.id)

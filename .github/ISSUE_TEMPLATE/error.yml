@@ -1,0 +1,34 @@
+name: Error
+description: Algo no funciona o se ve mal
+title: 'fix: '
+labels: [error]
+body:
+  - type: markdown
+    attributes:
+      value: Para informar de una vulnerabilidad en privado, usa Security → Report a vulnerability.
+  - type: textarea
+    id: que-pasa
+    attributes:
+      label: ¿Qué pasa?
+      description: Qué esperabas y qué ha ocurrido.
+    validations:
+      required: true
+  - type: dropdown
+    id: parte
+    attributes:
+      label: Parte afectada
+      options: [web (frontend), API (backend), base de datos, CI/CD, no lo sé]
+    validations:
+      required: true
+  - type: input
+    id: entorno
+    attributes:
+      label: Navegador y dispositivo
+      placeholder: Firefox 140, escritorio / Chrome, Android
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Cómo reproducirlo
+      placeholder: |
+        1. Abre ...
+        2. Pulsa ...

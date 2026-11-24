@@ -52,3 +52,20 @@ test('cargar sustituye los valores por los guardados', async () => {
   await store.getState().load()
   expect(store.getState().settings.motion).toBe('reduced')
 })
+
+test('leer fotos en el servidor viene apagado y hay que activarlo', async () => {
+  const { db, repo } = open()
+  expect((await repo.load()).photoReading).toBe(false)
+  await db.settings.put({ key: 'preferences', value: { textSize: 'large' } })
+  expect(await repo.load()).toMatchObject({ textSize: 'large', photoReading: false })
+  await db.settings.put({ key: 'preferences', value: { photoReading: 'si' } })
+  expect((await repo.load()).photoReading).toBe(false)
+})
+
+test('el dictado está apagado hasta que alguien lo activa, también con preferencias antiguas o dañadas', async () => {
+  const db = new VitaDb('vita-dictado')
+  const repo = createSettingsRepository(db)
+  expect((await repo.load()).dictation).toBe('off')
+  await db.settings.put({ key: 'preferences', value: { textSize: 'large', dictation: true } })
+  expect(await repo.load()).toMatchObject({ textSize: 'large', dictation: 'off' })
+})

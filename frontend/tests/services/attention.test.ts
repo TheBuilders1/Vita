@@ -99,3 +99,9 @@ test('que un plazo se abriera hace días no es un atraso; que se cerrara, sí', 
   expect(when(rec('grant', 'grants', { ...grant, openDate: '2026-11-14', deadline: '2027-03-01' }))).toEqual([])
   expect(when(rec('grant', 'grants', { ...grant, openDate: '2026-10-01', deadline: '2026-11-20' }))).toEqual(['overdue'])
 })
+
+test.each(['2026-11-19', '2010-11-24', today, '2026-11-25'])('el resumen solo cuenta la tarea del %s y conserva su hora', (dueDate) => {
+  const items = look(rec('task', 'planner', { title: 'Regar', dueDate, repeat: 'daily', time: '09:30' }))
+  expect(items.map(({ item }) => [item.date, item.time])).toEqual([[dueDate, '09:30']])
+  expect(pendingByModule(items).get('planner')).toBe(1)
+})

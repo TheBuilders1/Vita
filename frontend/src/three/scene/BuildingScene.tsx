@@ -1,4 +1,3 @@
-import { OrthographicCamera } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import { useMemo, type RefObject } from 'react'
 import { PCFShadowMap, NoToneMapping } from 'three'
@@ -46,12 +45,13 @@ export default function BuildingScene({ rooms, floorId, moduleId, hovered, insta
       frameloop="demand"
       dpr={[1, 2]}
       shadows={{ type: PCFShadowMap }}
+      orthographic
+      camera={{ near: 1, far: 140 }}
       gl={{ antialias: true, alpha: true, toneMapping: NoToneMapping, powerPreference: 'default' }}
       onCreated={({ gl }) => gl.domElement.addEventListener('webglcontextlost', onLost, { once: true })}
       style={{ cursor: hovered ? 'pointer' : undefined, touchAction: 'pan-y' }}
       tabIndex={-1}
     >
-      <OrthographicCamera makeDefault near={1} far={140} />
       <CameraRig box={box} instant={instant} labels={labels} />
       <Lighting />
       <GroundShadow />

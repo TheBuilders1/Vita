@@ -1,4 +1,4 @@
-import * as z from 'zod'
+import * as z from '@/utils/zod'
 import type { VitaDb } from '@/database/db'
 import { validationErrorFrom } from '@/services/errors'
 
@@ -10,11 +10,15 @@ const shape = {
   motion: z.enum(['system', 'reduced']),
   building: z.enum(['3d', 'simple']),
   emergencyNumber: phone,
+  /** Permite enviar fotos de documentos al servidor del hogar. Apagado hasta que alguien lo active. */
+  photoReading: z.boolean(),
+  /** device: solo si la voz no sale del dispositivo · any: también si el navegador la envía a su fabricante. */
+  dictation: z.enum(['off', 'device', 'any']),
 }
 const settingsSchema = z.object(shape)
 export type Settings = z.infer<typeof settingsSchema>
 
-export const DEFAULT_SETTINGS: Settings = { textSize: 'normal', contrast: 'normal', motion: 'system', building: '3d', emergencyNumber: '112' }
+export const DEFAULT_SETTINGS: Settings = { textSize: 'normal', contrast: 'normal', motion: 'system', building: '3d', emergencyNumber: '112', photoReading: false, dictation: 'off' }
 
 /** Al leer, cada preferencia dañada vuelve a su valor por defecto sin arrastrar a las demás. */
 const tolerantSchema = z.object({
@@ -23,6 +27,8 @@ const tolerantSchema = z.object({
   motion: shape.motion.catch(DEFAULT_SETTINGS.motion),
   building: shape.building.catch(DEFAULT_SETTINGS.building),
   emergencyNumber: phone.catch(DEFAULT_SETTINGS.emergencyNumber),
+  photoReading: shape.photoReading.catch(DEFAULT_SETTINGS.photoReading),
+  dictation: shape.dictation.catch(DEFAULT_SETTINGS.dictation),
 }).catch(DEFAULT_SETTINGS)
 
 const KEY = 'preferences'

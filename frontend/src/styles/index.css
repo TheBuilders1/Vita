@@ -39,6 +39,18 @@
   .dialog-root::backdrop { background: rgb(22 34 56 / 0.62); }
 }
 
+/* La hoja para imprimir vive fuera de la aplicación y solo existe en papel. */
+.print-sheet { display: none; }
+@media print {
+  body:has(> .print-sheet) > :not(.print-sheet) { display: none !important; }
+  .print-sheet { display: block; color: #000; font-size: 12pt; }
+  .print-sheet h1 { font-size: 22pt; }
+  .print-sheet h2 { font-size: 16pt; }
+  .print-sheet section, .print-sheet dl > div, .print-sheet img { break-inside: avoid; }
+  body:has(> .print-sheet) { background: #fff; min-height: 0; }
+  @page { margin: 18mm; }
+}
+
 /* Los colores forzados del sistema eliminan las sombras: hace falta un borde real. */
 @media (forced-colors: active) {
   .pixel-edge { border: 2px solid ButtonBorder; }

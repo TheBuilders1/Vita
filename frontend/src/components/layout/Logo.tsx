@@ -1,5 +1,16 @@
 import { cx } from '@/utils/cx'
 
+/** Solo el símbolo, para sitios pequeños. Es decorativo: el nombre va escrito al lado. */
+export function LogoMark({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 56 66" className={className}>
+      <path className="fill-logo-teja" d="M0 30a28 28 0 0 1 56 0v31a5 5 0 0 1-5 5H5a5 5 0 0 1-5-5z" />
+      <path className="fill-logo-sol" d="M9 31a19 19 0 0 1 38 0v35H9z" />
+      <path className="stroke-logo-tinta" fill="none" strokeWidth="7.500" strokeLinecap="round" strokeLinejoin="round" d="M19 37l8 12L38 31" />
+    </svg>
+  )
+}
+
 /** Marca de Vita: la boca del hogar encendida y, dentro, la V como señal de «hecho». Las letras toman el color del texto. */
 export function Logo({ className }: { className?: string }) {
   return (

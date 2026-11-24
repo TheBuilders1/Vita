@@ -6,6 +6,7 @@ import { createRecordRepository } from './records'
 import { createSessionRepository } from './session'
 import { createSettingsRepository } from './settings'
 import { createTipsRepository } from './tips'
+import { createTrashRepository } from './trash'
 
 export function createRepositories(db: VitaDb, now: () => Date = () => new Date()) {
   const ctx = { db, now }
@@ -17,6 +18,7 @@ export function createRepositories(db: VitaDb, now: () => Date = () => new Date(
     settings: createSettingsRepository(db),
     tips: createTipsRepository(db),
     backup: createBackupRepository(ctx),
+    trash: createTrashRepository(ctx),
   }
 }
 

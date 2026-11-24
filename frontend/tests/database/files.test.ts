@@ -70,3 +70,52 @@ test('al eliminar a un integrante desaparece también lo que subió sin llegar a
   await home.family.removeMember(home.marta, home.nora)
   expect(await home.db.files.toCollection().primaryKeys()).toEqual([kept.id])
 })
+
+test('un archivo que llega sin tipo se reconoce y se guarda con el suyo', async () => {
+  const jpg = new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], 'foto', { type: '' })
+  const stored = await home.files.add(home.marta, jpg)
+  expect(stored.mime).toBe('image/jpeg')
+  expect((await home.files.get(home.marta, stored.id))?.blob.type).toBe('image/jpeg')
+})
+
+test('sustituir un archivo conserva su sitio y libera el anterior; cancelar no pierde nada', async () => {
+  const [a, b] = [await home.files.add(home.marta, pdf('a')), await home.files.add(home.marta, pdf('b'))]
+  const record = await home.records.create(home.marta, doc([a.id, b.id]))
+  const c = await home.files.add(home.marta, pdf('c'))
+  expect(await home.files.get(home.marta, a.id)).toBeDefined()
+  await home.records.update(home.marta, record.id, { data: { title: 'DNI', kind: 'id', files: [c.id, b.id] } })
+  expect((await home.records.get(home.marta, record.id))?.data.files).toEqual([c.id, b.id])
+  expect((await home.db.files.toCollection().primaryKeys()).toSorted()).toEqual([b.id, c.id].toSorted())
+})
+
+test('los enlaces de un documento siguen sus permisos', async () => {
+  const record = await home.records.create(home.marta, { typeId: 'document', data: { title: 'DNI', kind: 'id', links: ['www.dgt.es'] } })
+  expect((await home.records.get(home.marta, record.id))?.data.links).toEqual(['https://www.dgt.es'])
+  expect(await home.records.get(home.andres, record.id)).toBeUndefined()
+})
+
+test('el origen de la caducidad se guarda con el documento', async () => {
+  const file = await home.files.add(home.marta, pdf())
+  const record = await home.records.create(home.marta, { typeId: 'document', data: { title: 'DNI', kind: 'id', files: [file.id], expiryDate: '2030-12-31', scannedDate: '2030-12-31', scannedFile: file.id } })
+  expect((await home.records.get(home.marta, record.id))?.data).toMatchObject({ expiryDate: '2030-12-31', scannedDate: '2030-12-31', scannedFile: file.id })
+})
+
+test('duplicar un archivo da otro propio, sin tocar el original', async () => {
+  const file = await home.files.add(home.marta, new File(['hola'], 'nota.txt', { type: 'text/plain' }))
+  const record = await home.records.create(home.marta, { typeId: 'document', data: { title: 'Contrato', kind: 'contract', files: [file.id] } })
+  const copy = await home.files.copy(home.marta, file.id)
+  expect(copy).toMatchObject({ name: 'nota.txt', size: 4, uploadedBy: home.marta })
+  expect(copy!.id).not.toBe(file.id)
+  expect(copy!.recordId).toBeUndefined()
+  expect(await home.files.get(home.marta, file.id)).toMatchObject({ recordId: record.id })
+})
+test('no se duplica un archivo que no se puede ver', async () => {
+  const file = await home.files.add(home.marta, new File(['hola'], 'nota.txt', { type: 'text/plain' }))
+  expect(await home.files.copy(home.andres, file.id)).toBeUndefined()
+})
+
+test('un nombre larguísimo se acorta sin perder la extensión', async () => {
+  const file = await home.files.add(home.marta, new File(['hola'], `${'a'.repeat(400)}.txt`, { type: 'text/plain' }))
+  expect(file.name.length).toBeLessThanOrEqual(200)
+  expect(file.name.endsWith('….txt')).toBe(true)
+})

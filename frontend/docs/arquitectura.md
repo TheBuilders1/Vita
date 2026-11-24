@@ -20,11 +20,14 @@ independientes (duplicación) y un CRUD solo genérico (parecería un panel de a
 - **Fechas** como `AAAA-MM-DD` y horas `HH:mm` locales. **Dinero** en céntimos enteros.
 - **Permisos** comprobados en los repositorios, con el actor leído de la base en cada operación.
   - Un miembro modifica solo lo que crea; un responsable puede marcarlo como hecho.
-  - `private` solo lo ve su autor, ni siquiera el máster. `restricted`: autor, protagonistas, invitados y másteres.
-  - Emergencias es siempre legible y no se puede desactivar. Siempre queda un máster.
+  - `private` solo lo ve su autor, ni siquiera el admin. `restricted`: autor, protagonistas, invitados y admins.
+  - Emergencias es siempre legible y no se puede desactivar. Siempre queda un admin.
   - Con acceso de lectura se puede anotar lo propio (`selfLog`): una toma, un cuidado.
 - **Protagonistas** (`subjectIds`) se derivan de los campos `member` y `members`.
 - **Borrados**: `planRemoval` calcula lo que se borra y lo que solo pierde una referencia; sirve para avisar y para ejecutar.
+  - `records.remove` lo pasa a la **papelera** (tabla `trash`, 30 días) con lo que dependía de él, sus archivos y los enlaces que otros perdieron; `trash.restore` lo devuelve sin pisar lo cambiado después. `records.erase` no deja rastro: es para deshacer algo recién apuntado.
+  - La papelera no viaja en la copia de seguridad, y se vacía al borrar todo, al restaurar una copia y, en lo que le toca, al quitar a una persona.
+  - Una toma o una aportación tiene que ser de la misma persona que su medicamento u objetivo (`isOfAnother`).
 - **Archivos**: JPG, PNG, WebP, GIF, PDF y texto, hasta 15 MB. Heredan la visibilidad de su registro y se borran con él.
 - **Franjas de edad**: 0-18, 19-39 y 40 o más. El encargo dejaba sin definir 19 y 35-39.
 
@@ -75,3 +78,14 @@ Catálogo vivo en `/sistema`. Tokens en `src/styles/tokens.css`; `tests/styles/c
 
 ## Fondo
 `components/backdrop/`: paisaje pixel art dibujado a baja resolución. Versión completa donde está el edificio y suave donde hay texto; un test comprueba el contraste. Se oculta con contraste alto.
+
+## Historial, impresión, copias y sin conexión
+- **Historial** (`services/history.ts`): va dentro del registro (`history`), así hereda su visibilidad, su papelera y su copia. Guarda quién, cuándo y qué campos; nunca los valores. Crear no se apunta.
+- **Imprimir** (`components/print/PrintSheet.tsx`): la hoja se monta fuera de `#root` y solo existe en `@media print`.
+- **Copia con contraseña** (`services/cipher.ts`): PBKDF2-SHA-256 (600 000 vueltas) y AES-256-GCM con WebCrypto. La contraseña no se guarda. Sin HTTPS no hay WebCrypto y solo se ofrece sin cifrar.
+- **Versión de las copias:** 3 (fotos de perfil e historial). Las 1 y 2 se siguen restaurando.
+- **Sin conexión** (`server/offline.ts`, `app/offline.ts`): el service worker guarda solo el programa. La versión nueva espera a que la persona pulse «Actualizar». Al desarrollar se desinstala solo.
+- **Dictado** (`hooks/useDictation.ts`): apagado por defecto. Se elige entre solo en el dispositivo o también con el servicio del navegador (con aviso). `SpeechRecognition.available()` tumba la pestaña en Chrome Headless Shell 159: nunca se llama al abrir una pantalla, solo al pulsar «Dictar».
+- **Voz** (`services/speech.ts`): solo voces `localService` en español.
+- **`uniqueBy`**: un registro por valor (un tope por categoría). Lo privado de otra persona no cuenta.
+- **Pruebas de navegador** (`e2e/`, `pnpm e2e`): versión compilada, 320 y 1440 px, con axe. Con `VITA_CHROMIUM=/ruta` se usa un navegador ya instalado.

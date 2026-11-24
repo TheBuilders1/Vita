@@ -64,6 +64,7 @@ const grants = defineModule({
         status: { kind: 'select', label: 'Estado', required: true, options: options({ pending: 'Por preparar', preparing: 'Reuniendo documentos', submitted: 'Presentada', granted: 'Concedida', denied: 'Denegada' }) },
         requirements: { kind: 'tags', label: 'Documentos necesarios' },
         files: { kind: 'files', label: 'Archivos' },
+        links: { kind: 'links', label: 'Enlaces' },
         notes: { kind: 'textarea', label: 'Notas' },
       },
       rules: [notBefore('openDate', 'deadline', 'El último día no puede ser anterior a la apertura')],
@@ -80,7 +81,7 @@ const development = defineModule({
   description: 'Etapas, hitos y momentos importantes del crecimiento.',
   recordTypes: [
     defineRecordType({
-      id: 'milestone', name: 'Hito', plural: 'Hitos', titleField: 'title',
+      id: 'milestone', name: 'Logro', plural: 'Logros', titleField: 'title',
       fields: {
         member: { kind: 'member', label: 'Niño o niña', required: true },
         title: { kind: 'text', label: 'Hito', required: true },

@@ -7,10 +7,11 @@ import { newId } from '@/utils/ids'
 import { loadActor, type RepositoryContext } from './context'
 import { SESSION_KEY } from './session'
 import { applyRemoval, summarize, type RemovalSummary } from './removal'
+import { forgetInTrash } from './trash'
 
-/** Lo que cada persona puede cambiar de su propio perfil sin ser máster. */
-const SELF_EDITABLE = new Set<string>(['name', 'birthDate', 'relationship'])
-const NEEDS_MASTER = 'El hogar necesita al menos un máster'
+/** Lo que cada persona puede cambiar de su propio perfil sin ser admin. */
+const SELF_EDITABLE = new Set<string>(['name', 'birthDate', 'relationship', 'photo'])
+const NEEDS_MASTER = 'El hogar necesita al menos un admin'
 
 const parseFamily = (input: FamilyInput) => {
   const parsed = familyInputSchema.safeParse(input)
@@ -106,22 +107,23 @@ export function createFamilyRepository(ctx: RepositoryContext) {
         return summarize(await planMemberRemoval(id, actor.id))
       }),
 
-    /** Como nadie se elimina a sí mismo y solo elimina un máster, siempre queda al menos uno. */
+    /** Como nadie se elimina a sí mismo y solo elimina un admin, siempre queda al menos uno. */
     removeMember: (actorId: string, id: string): Promise<void> =>
-      db.transaction('rw', db.members, db.records, db.files, async () => {
+      db.transaction('rw', db.members, db.records, db.files, db.trash, async () => {
         const actor = await requireManager(actorId, 'family')
         if (actor.id === id) throw new ConflictError('No puedes eliminar tu propio perfil')
         await requireMember(id)
-        await applyRemoval(db, await planMemberRemoval(id, actor.id))
+        await applyRemoval(ctx, actor.id, await planMemberRemoval(id, actor.id))
         await db.files.filter((f) => f.recordId === undefined && f.uploadedBy === id).delete()
+        await forgetInTrash(ctx, { id, heirId: actor.id })
         await db.members.delete(id)
       }),
 
-    /** Borra la familia y todo su contenido. Conserva las preferencias del dispositivo. */
+    /** Borra el hogar y todo su contenido. Conserva las preferencias del dispositivo. */
     wipe: (actorId: string): Promise<void> =>
-      db.transaction('rw', [db.families, db.members, db.records, db.files, db.settings], async () => {
+      db.transaction('rw', [db.families, db.members, db.records, db.files, db.trash, db.settings], async () => {
         await requireManager(actorId, 'data')
-        await Promise.all([db.families.clear(), db.members.clear(), db.records.clear(), db.files.clear(), db.settings.delete(SESSION_KEY)])
+        await Promise.all([db.families.clear(), db.members.clear(), db.records.clear(), db.files.clear(), db.trash.clear(), db.settings.delete(SESSION_KEY)])
       }),
   }
 }

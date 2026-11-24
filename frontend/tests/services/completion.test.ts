@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { completionFor } from '@/services/completion'
+import { completionFor, completionMessage } from '@/services/completion'
 import { buildAgenda } from '@/services/agenda'
 import { buildMember, buildRecord } from '../support/builders'
 
@@ -34,4 +34,26 @@ describe('qué se puede dar por hecho', () => {
     expect(look(plan, buildMember('x', 'vulnerable'))).toBeNull()
     expect(look(appointment(today), other)).toBeNull()
   })
+})
+
+test('quien tiene la tarea asignada solo completa la fecha pendiente', () => {
+  const task = buildRecord({ data: { title: 'Regar', dueDate: today, repeat: 'daily' }, subjectIds: [pilar.id] })
+  const next = '2026-11-25'
+  expect(look(task, pilar)).toEqual({ kind: 'done', recordId: task.id })
+  expect(look(task, pilar, next)).toBeNull()
+})
+
+test('una fila antigua no puede completar la próxima repetición', () => {
+  const task = buildRecord({ data: { title: 'Regar', dueDate: today, repeat: 'daily' } })
+  const [item] = buildAgenda({ records: [task], members: [], from: today, to: today })
+  if (!item) throw new Error('Falta la tarea en la agenda')
+  expect(completionFor(item, { ...task, data: { ...task.data, dueDate: '2026-11-25' } }, master, today)).toBeNull()
+})
+
+test.each([
+  ['2026-11-24', 'Hecho: Regar. La próxima, hoy'],
+  ['2026-11-25', 'Hecho: Regar. La próxima, mañana'],
+  [undefined, 'Hecho: Regar'],
+])('el aviso dice cuándo toca la siguiente si la hay (%s)', (date, message) => {
+  expect(completionMessage('Regar', today, date)).toBe(message)
 })

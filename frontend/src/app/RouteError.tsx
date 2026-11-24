@@ -6,7 +6,7 @@ export function RouteError() {
   const error = useRouteError()
   useEffect(() => { console.error(error) }, [error])
   return (
-    <MessagePage title="Algo ha fallado en esta pantalla" action={<a className="underline underline-offset-4" href="/">Volver al inicio</a>}>
+    <MessagePage title="Algo ha fallado en esta pantalla" action={<a className="underline underline-offset-4" href={import.meta.env.BASE_URL}>Volver al inicio</a>}>
       Tus datos guardados siguen en este dispositivo. Vuelve al inicio e inténtalo de nuevo.
     </MessagePage>
   )

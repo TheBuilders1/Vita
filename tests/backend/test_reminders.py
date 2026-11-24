@@ -41,3 +41,15 @@ def test_unknown_timezone_is_rejected() -> None:
             "Mars/Olympus",
             now=datetime(2027, 1, 1, tzinfo=timezone.utc),
         )
+
+
+@pytest.mark.parametrize("zone", ["Europe/Madrid", "Pacific/Auckland", "America/Lima"])
+@pytest.mark.parametrize("days_before", [0, 365])
+def test_dates_before_the_calendar_starts_are_past(zone: str, days_before: int) -> None:
+    with pytest.raises(ReminderInPast):
+        scheduled_reminder_at(
+            date(1, 1, 1),
+            days_before,
+            zone,
+            now=datetime(2027, 1, 1, tzinfo=timezone.utc),
+        )

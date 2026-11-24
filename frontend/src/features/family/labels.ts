@@ -1,9 +1,9 @@
 import type { Access } from '@/modules/types'
 import type { Need, Role } from '@/types/family'
 
-export const ROLE_LABELS: Record<Role, string> = { master: 'Máster del hogar', member: 'Miembro del hogar', vulnerable: 'Perfil vulnerable' }
+export const ROLE_LABELS: Record<Role, string> = { master: 'Admin del hogar', member: 'Miembro del hogar', vulnerable: 'Perfil vulnerable' }
 export const ROLE_OPTIONS = [
-  { value: 'master', label: ROLE_LABELS.master, hint: 'Administra el hogar, los permisos y las habitaciones.' },
+  { value: 'master', label: ROLE_LABELS.master, hint: 'Administra las personas, los permisos, las habitaciones y las copias.' },
   { value: 'member', label: ROLE_LABELS.member, hint: 'Consulta, añade y cambia lo suyo.' },
   { value: 'vulnerable', label: ROLE_LABELS.vulnerable, hint: 'Pantalla sencilla, con botones grandes y lo esencial.' },
 ] as const

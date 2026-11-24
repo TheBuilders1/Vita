@@ -7,7 +7,7 @@ export function DemoBanner() {
   const { actor } = useHome()
   const [open, setOpen] = useState(false)
   return (
-    <aside aria-label="Hogar de demostración" className="flex flex-wrap items-center justify-between gap-x-6 bg-aviso-fondo px-4 sm:px-6">
+    <aside aria-label="Hogar de demostración" className="flex flex-wrap items-center justify-between gap-x-6 max-sm:gap-x-2 bg-aviso-fondo px-4 sm:px-6">
       <p className="py-1.5"><span className="sm:hidden">Datos de ejemplo</span><span className="max-sm:hidden">Estás viendo un hogar de demostración. Todo es ficticio.</span></p>
       {canManage(actor, 'data') && (
         <button type="button" onClick={() => setOpen(true)} className="min-h-11 font-bold underline underline-offset-4">Crear mi hogar</button>

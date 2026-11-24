@@ -1,7 +1,7 @@
 import type { Field, RecordData } from '@/modules/fields'
 import type { RecordTypeDef } from '@/modules/types'
 
-const EMPTY_LIST: ReadonlySet<Field['kind']> = new Set(['choices', 'members', 'weekdays', 'tags', 'times', 'ingredients', 'files'])
+const EMPTY_LIST: ReadonlySet<Field['kind']> = new Set(['choices', 'members', 'weekdays', 'tags', 'times', 'ingredients', 'files', 'links'])
 
 /** Punto de partida de un alta: hoy en la fecha obligatoria y al menos una línea en las listas obligatorias. */
 export function emptyData(type: RecordTypeDef, today: string): RecordData {

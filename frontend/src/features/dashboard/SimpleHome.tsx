@@ -1,14 +1,16 @@
-import { Building2, CalendarDays, Phone, Settings } from 'lucide-react'
+import { Building2, CalendarDays, CircleHelp, MessageCircle, Phone, Search, Settings } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { useStore } from 'zustand'
 import { useHome } from '@/app/providers/home'
 import { ButtonLink } from '@/components/ui/Button'
+import { ListenButton } from '@/components/ui/ListenButton'
 import { AgendaRow } from '@/features/calendar/AgendaRow'
 import { useAttention } from '@/hooks/useAttention'
 import { useTitle } from '@/hooks/useTitle'
 import { useToday } from '@/hooks/useToday'
 import type { AgendaItem } from '@/services/agenda'
+import { spokenAgenda } from '@/services/speech'
 import { settingsStore } from '@/store'
 import { formatDay } from '@/utils/format'
 import { telLink } from '@/utils/links'
@@ -32,6 +34,7 @@ export function SimpleHome() {
       <header>
         <h1 className="text-4xl font-bold">Hola, {actor.name}</h1>
         <p className="mt-1 text-2xl">{formatDay(today)}</p>
+        <div className="mt-3"><ListenButton size="lg" label="Escuchar lo de hoy" text={() => spokenAgenda('Hoy', on('today'))} /></div>
       </header>
       <Section title="Hoy" items={on('today')} empty="Hoy no tienes nada pendiente." />
       <Section title="Mañana" items={on('tomorrow')} />
@@ -43,8 +46,11 @@ export function SimpleHome() {
         </div>
       </section>
       <div className="flex flex-wrap gap-3">
+        <ButtonLink to="/vita" size="lg" icon={MessageCircle}>Pídeselo a Vita</ButtonLink>
         <ButtonLink to="/calendario" size="lg" icon={CalendarDays}>Mi calendario</ButtonLink>
         <ButtonLink to="/edificio" size="lg" icon={Building2}>Ver la casa</ButtonLink>
+        <ButtonLink to="/buscar" size="lg" icon={Search}>Buscar</ButtonLink>
+        <ButtonLink to="/ayuda" size="lg" icon={CircleHelp}>Ayuda</ButtonLink>
       </div>
       <Link to="/ajustes" className="inline-flex min-h-12 items-center gap-2 font-bold underline underline-offset-4"><Settings aria-hidden="true" className="size-6" />Cambiar el tamaño del texto</Link>
     </div>

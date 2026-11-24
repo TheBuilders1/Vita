@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Notice } from '@/components/ui/Notice'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { settingsStore } from '@/store'
+import { cx } from '@/utils/cx'
 import { cameraStore } from '../camera/cameraStore'
 import type { BuildingProps } from '../types'
 import { Building2D } from './Building2D'
@@ -23,13 +24,26 @@ function supportsWebGL2(): boolean {
 }
 
 /** Elige entre el edificio 3D y su versión sencilla; si el 3D falla, nunca se pierde la navegación. */
-export function BuildingView({ decorative = false, ...props }: BuildingProps & { decorative?: boolean }) {
+export function BuildingView({ decorative = false, stageClassName = 'h-full', ...props }: BuildingProps & { decorative?: boolean; stageClassName?: string }) {
   const preference = useStore(settingsStore, (s) => s.settings.building)
   const [attempt, setAttempt] = useState(0)
-  const [failed, setFailed] = useState(() => preference === '3d' && !supportsWebGL2())
+  const [failed, setFailed] = useState(false)
+  const [checked, setChecked] = useState(false)
   const instant = useReducedMotion()
   const labels = useRef<HTMLDivElement>(null)
   const fail = () => setFailed(true)
+
+  useEffect(() => {
+    if (preference !== '3d' || checked) return
+    // Deja que las plantas y los botones se pinten antes de pedir un contexto WebGL.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        setFailed(!supportsWebGL2())
+        setChecked(true)
+      })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [preference, checked])
 
   if (decorative && (failed || preference === 'simple')) return null
   if (preference === 'simple') return <Building2D {...props} />
@@ -44,12 +58,15 @@ export function BuildingView({ decorative = false, ...props }: BuildingProps & {
       </div>
     )
   }
+  const loading = <p className="grid h-full place-items-center">Preparando el edificio…</p>
   return (
     <SceneBoundary key={attempt} onError={fail}>
-      <Stage selection={`${props.floorId}/${props.moduleId}`} controls={!decorative}>
-        <Suspense fallback={<p className="grid h-full place-items-center">Preparando el edificio…</p>}>
-          <BuildingScene {...props} instant={instant} onLost={fail} labels={labels} />
-          <LabelLayer ref={labels} {...props} />
+      <Stage selection={`${props.floorId}/${props.moduleId}`} controls={!decorative} className={stageClassName}>
+        <Suspense fallback={loading}>
+          {checked ? <>
+            <BuildingScene {...props} instant={instant} onLost={fail} labels={labels} />
+            <LabelLayer ref={labels} {...props} />
+          </> : loading}
         </Suspense>
       </Stage>
     </SceneBoundary>
@@ -57,7 +74,7 @@ export function BuildingView({ decorative = false, ...props }: BuildingProps & {
 }
 
 /** Zoom con botones o pellizco y arrastre para desplazarse. El encuadre vuelve al cambiar de habitación. */
-function Stage({ selection, controls, children }: { selection: string; controls: boolean; children: ReactNode }) {
+function Stage({ selection, controls, className, children }: { selection: string; controls: boolean; className: string; children: ReactNode }) {
   const { zoomBy, panBy, reset } = cameraStore.getState()
   const zoomed = useStore(cameraStore, (s) => s.zoom > 1)
   const ref = useRef<HTMLDivElement>(null)
@@ -95,7 +112,7 @@ function Stage({ selection, controls, children }: { selection: string; controls:
   const release = (e: PointerEvent) => { pointers.current.delete(e.pointerId) }
 
   return (
-    <div className={controls ? 'relative h-full' : 'pointer-events-none relative h-full'}>
+    <div className={cx('relative', className, !controls && 'pointer-events-none')}>
       <div
         ref={ref}
         aria-hidden="true"

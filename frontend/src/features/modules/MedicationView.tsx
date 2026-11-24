@@ -44,7 +44,7 @@ function Dose({ item }: { item: AgendaItem }) {
     const { show } = toastStore.getState()
     repositories.records.create(actor.id, { typeId: completion.typeId, data: { ...completion.data, status } })
       .then((saved) => show(status === 'taken' ? `Tomada: ${item.title}` : `No tomada: ${item.title}`, 'success', {
-        label: 'Deshacer', run: () => { repositories.records.remove(actor.id, saved.id).catch((e: unknown) => show(describeError(e), 'error')) },
+        label: 'Deshacer', run: () => { repositories.records.erase(actor.id, saved.id).catch((e: unknown) => show(describeError(e), 'error')) },
       }))
       .catch((e: unknown) => show(describeError(e), 'error'))
   }

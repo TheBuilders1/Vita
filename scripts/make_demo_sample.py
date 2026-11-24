@@ -7,13 +7,8 @@ def main() -> None:
     output = Path("vita-demo-document.png")
     image = Image.new("RGB", (1200, 700), "white")
     draw = ImageDraw.Draw(image)
-    try:
-        font = ImageFont.truetype(
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            42,
-        )
-    except OSError:
-        font = ImageFont.load_default()
+    # Incluida en Pillow: la muestra sale igual en cualquier sistema.
+    font = ImageFont.load_default(size=42)
 
     lines = [
         "DOCUMENTO DE PRUEBA - NO VALIDO",

@@ -24,9 +24,10 @@ export function createBackupRepository(ctx: RepositoryContext) {
 
     /** Incluye todo, también lo privado de cada persona: la copia no está cifrada. */
     async export(actorId: string): Promise<Backup> {
-      await requireManager(actorId)
-      const [family, members, records, files] = await db.transaction('r', [db.families, db.members, db.records, db.files], () =>
-        Promise.all([db.families.toCollection().first(), db.members.toArray(), db.records.toArray(), db.files.toArray()]))
+      const [family, members, records, files] = await db.transaction('r', [db.families, db.members, db.records, db.files], async () => {
+        await requireManager(actorId)
+        return Promise.all([db.families.toCollection().first(), db.members.toArray(), db.records.toArray(), db.files.toArray()])
+      })
       if (!family) throw new NotFoundError('Todavía no hay ningún hogar')
       const attached = files.flatMap((f) => (f.recordId === undefined ? [] : [{ ...f, recordId: f.recordId }]))
       const encoded = await Promise.all(attached.map(async ({ blob, size: _size, ...file }) => ({ ...file, data: await blobToBase64(blob) })))
@@ -36,14 +37,15 @@ export function createBackupRepository(ctx: RepositoryContext) {
 
     /** Sustituye todo por el contenido de la copia, o no cambia nada. */
     async restore(actorId: string | null, text: string): Promise<void> {
-      if ((await db.families.count()) > 0) await requireManager(actorId)
       const { family, members, records, files } = parseBackup(text)
       const stored = files.map(({ data, ...file }) => {
         const blob = base64ToBlob(data, file.mime)
         return { ...file, blob, size: blob.size }
       })
-      await db.transaction('rw', [db.families, db.members, db.records, db.files, db.settings], async () => {
-        await Promise.all([db.families.clear(), db.members.clear(), db.records.clear(), db.files.clear(), db.settings.delete(SESSION_KEY)])
+      await db.transaction('rw', [db.families, db.members, db.records, db.files, db.trash, db.settings], async () => {
+        // Dentro: entretanto otra pestaña puede haber creado un hogar o quitado el permiso.
+        if ((await db.families.count()) > 0) await requireManager(actorId)
+        await Promise.all([db.families.clear(), db.members.clear(), db.records.clear(), db.files.clear(), db.trash.clear(), db.settings.delete(SESSION_KEY)])
         await db.families.add(family)
         await db.members.bulkAdd(members)
         await db.records.bulkAdd(records)
