@@ -41,7 +41,16 @@
           allow: ["sessions_spawn", "sessions_yield", "vita_report_result"],
         },
         subagents: {
-          allowAgents: ["documentos"],
+          allowAgents: ["documentos", "calendario"],
+        },
+      },
+      calendario: {
+        workspace: "/absolute/path/to/Vita/openclaw/agents/calendario",
+        tools: {
+          allow: ["vita_read_google_calendar"],
+        },
+        subagents: {
+          allowAgents: [],
         },
       },
       documentos: {

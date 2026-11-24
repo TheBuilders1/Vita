@@ -4,7 +4,11 @@
   "description": "Herramientas internas y acotadas para el backend Vita",
   "categories": ["integrations"],
   "contracts": {
-    "tools": ["vita_scan_document", "vita_report_result"]
+    "tools": [
+      "vita_scan_document",
+      "vita_read_google_calendar",
+      "vita_report_result"
+    ]
   },
   "activation": {
     "onStartup": true

@@ -1,14 +1,15 @@
 # Vita
 
-Backend de demostración para un asistente personal por hogar. El proyecto enseña dos flujos: delegar una tarea a agentes de OpenClaw y analizar una imagen privada con OCR local para proponer una fecha de caducidad. El usuario debe confirmar la fecha antes de que Vita persista un recordatorio.
+Backend de demostración para un asistente personal por hogar. El proyecto delega tareas a subagentes de OpenClaw, consulta Google Calendar en modo de solo lectura mediante OAuth y analiza imágenes privadas con OCR local para proponer fechas de caducidad.
 
-Está pensado para una demo local del hackathon, ejecutada desde `curl`; no tiene frontend, calendario integrado ni entrega de notificaciones. Todas las personas, imágenes y fechas de ejemplo son ficticias. **No uses documentos reales ni publiques la API o el Gateway de OpenClaw.**
+Está pensado para una demo local del hackathon, ejecutada desde `curl`; no tiene frontend ni entrega de notificaciones. La integración Calendar consulta el calendario principal del usuario, con autorización explícita y un rango limitado a 31 días; no puede crear ni modificar eventos. Todas las personas, imágenes y fechas de ejemplo son ficticias. **No uses documentos reales ni publiques la API o el Gateway de OpenClaw.**
 
 ## Funcionalidad
 
 - Autenticación local mediante tokens de demostración asociados a usuarios sembrados.
 - Comprobación de pertenencia al hogar y propiedad de ejecuciones y documentos.
 - Ejecuciones asíncronas de Vita hacia un Gateway privado de OpenClaw, con resultado estructurado y validado.
+- Conexión OAuth individual a Google Calendar, refresh token cifrado y consultas de solo lectura delegadas a un subagente especializado.
 - Carga privada de imágenes JPEG/PNG con límites de tamaño, dimensiones y decodificación.
 - OCR local con Tesseract; se extrae únicamente una fecha vinculada a una etiqueta de caducidad.
 - Confirmación o corrección explícita de la fecha antes de crear un recordatorio persistido en PostgreSQL.
@@ -19,15 +20,16 @@ Está pensado para una demo local del hackathon, ejecutada desde `curl`; no tien
 ```text
 Cliente (curl)
   └─ FastAPI: autentica, autoriza, valida y persiste
-       ├─ PostgreSQL: hogares, ejecuciones, documentos y recordatorios
+      ├─ PostgreSQL: hogares, ejecuciones, documentos, recordatorios y credenciales OAuth cifradas
        ├─ Volumen privado: archivos de imagen
        └─ Gateway OpenClaw privado
-            └─ orquestador ──delegación──> documentos
+      └─ orquestador ──delegación──> documentos / calendario
                  ├─ vita_scan_document ──> API interna ──> Tesseract local
+        ├─ vita_read_google_calendar ──> API interna ──> Google Calendar API
                  └─ vita_report_result ──> API interna ──> resultado validado
 ```
 
-OpenClaw se encarga de interpretar y delegar. No accede directamente a PostgreSQL ni al volumen de imágenes. La API es la autoridad para permisos, resultados, estados y escrituras; el texto final de un agente no se considera prueba de que una operación haya terminado.
+OpenClaw se encarga de interpretar y delegar. No accede directamente a PostgreSQL, al volumen de imágenes ni a credenciales OAuth. La API es la autoridad para permisos, rangos, resultados, estados y escrituras; el texto final de un agente no se considera prueba de que una operación haya terminado.
 
 ### Componentes
 
@@ -39,12 +41,13 @@ OpenClaw se encarga de interpretar y delegar. No accede directamente a PostgreSQ
 | `app/security.py` | Lectura de Bearer tokens y asociación servidor-token-usuario. |
 | `app/images.py` | Verificación del contenido, MIME, tamaño y dimensiones de imágenes. |
 | `app/ocr.py` | Ejecución de Tesseract y selección conservadora de fechas de caducidad. |
+| `app/google_calendar.py` | Flujo OAuth de Google, cifrado de credenciales y cliente de Calendar API de solo lectura. |
 | `app/reminders.py` | Cálculo de la hora local del recordatorio, con zona horaria IANA. |
 | `app/schemas.py` | Validación estricta de peticiones, resultados y respuestas con Pydantic. |
 | `app/database.py`, `app/migrate.py` | Conexión PostgreSQL, recuperación de ejecuciones interrumpidas y migraciones SQL. |
 | `migrations/` | Esquema relacional y datos ficticios iniciales. |
-| `openclaw/agents/` | Instrucciones y restricciones de los agentes `orquestador` y `documentos`. |
-| `openclaw/vita-tools/` | Plugin local que expone `vita_scan_document` y `vita_report_result`. |
+| `openclaw/agents/` | Instrucciones y restricciones de `orquestador`, `documentos` y `calendario`. |
+| `openclaw/vita-tools/` | Plugin local que expone `vita_scan_document`, `vita_read_google_calendar` y `vita_report_result`. |
 | `tests/` | Pruebas unitarias de los módulos principales. |
 
 ### Datos
@@ -52,7 +55,7 @@ OpenClaw se encarga de interpretar y delegar. No accede directamente a PostgreSQ
 PostgreSQL usa una sola instancia y dos esquemas con propietarios separados:
 
 - `gestion`: `users`, `households` y `memberships`.
-- `producto`: `runs`, `documents` y `reminders`.
+- `producto`: `runs`, `documents`, `reminders`, conexiones de Google Calendar y estados OAuth.
 
 Las tablas de producto relacionan los datos con un hogar y su propietario. Los metadatos de imágenes quedan en PostgreSQL; el archivo se guarda bajo una clave aleatoria en el volumen privado. No se almacena el texto OCR bruto. La fecha detectada se conserva como propuesta y solo pasa a confirmada cuando el usuario confirma.
 
@@ -83,7 +86,7 @@ Edita `.env` y reemplaza las contraseñas y tokens de ejemplo. Para las contrase
 
 ### 2. Configurar OpenClaw
 
-Combina [`openclaw/config.example.json5`](openclaw/config.example.json5) con tu configuración existente; reemplaza `/absolute/path/to/Vita` por la ruta absoluta de este repositorio. **No sobrescribas tu `openclaw.json`.** El ejemplo configura el Gateway con bind loopback, autenticación por token, el plugin y dos agentes con permisos limitados.
+Combina [`openclaw/config.example.json5`](openclaw/config.example.json5) con tu configuración existente; reemplaza `/absolute/path/to/Vita` por la ruta absoluta de este repositorio. **No sobrescribas tu `openclaw.json`.** El ejemplo configura el Gateway con bind loopback, autenticación por token, el plugin y tres agentes con permisos limitados.
 
 Instala la dependencia TypeBox del plugin (los plugins enlazados no resuelven automáticamente sus dependencias), y después instálalo y comprueba sus herramientas:
 
@@ -105,8 +108,11 @@ export VITA_API_URL='http://127.0.0.1:8000'
 
 Verifica que los agentes tengan cargados sus `AGENTS.md` y que sus herramientas estén restringidas como se indica en el ejemplo:
 
-- `orquestador`: `sessions_spawn`, `sessions_yield` y `vita_report_result`; solo puede delegar en `documentos`.
+- `orquestador`: `sessions_spawn`, `sessions_yield` y `vita_report_result`; solo puede delegar en `documentos` o `calendario` según el tipo de tarea.
 - `documentos`: solo `vita_scan_document`; no puede delegar, acceder a archivos directamente, ejecutar comandos ni usar navegador o mensajería.
+- `calendario`: solo `vita_read_google_calendar`; no puede delegar, acceder a tokens, escribir en Calendar, ejecutar comandos, usar navegador ni mensajería.
+
+Para activar Calendar, crea en Google Cloud un cliente OAuth de tipo Web, habilita Google Calendar API y registra como redirect URI autorizada el valor exacto de `GOOGLE_OAUTH_REDIRECT_URI` (por ejemplo, `http://localhost:8000/v1/calendar/oauth/callback` en local). Se solicitan únicamente `openid` y `calendar.events.readonly`; Google devuelve `code`, `state` o `error` por query al callback GET estándar. Vita valida `state`, PKCE y el `nonce` del ID token, vincula la cuenta por su `sub` verificado, procesa el código y redirige a una URL limpia sin el código. En `.env`, configura `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` y `GOOGLE_TOKEN_ENCRYPTION_KEY`. Genera una clave Fernet nueva y persistente para esta instalación; no la rotes mientras existan tokens cifrados, no la guardes en el repo y no la compartas con el Gateway. La API requiere las cuatro variables juntas; si están vacías, Calendar queda desactivado. El modo de consentimiento Testing de Google puede limitar refresh tokens a 7 días; en esa situación reconecta la cuenta cuando el token caduque.
 
 Si el Gateway corre en otro contenedor, no expongas el puerto en la LAN: configura una red privada compartida y restringe el acceso antes de cambiar `OPENCLAW_BASE_URL` y `VITA_API_URL`.
 
@@ -136,8 +142,51 @@ Las rutas de usuario usan `Authorization: Bearer <token>`. El cliente no puede e
 | `GET /v1/runs/{run_id}` | Consulta estado y resultado; solo el usuario creador. |
 | `POST /v1/documents` | Carga una imagen JPEG/PNG como multipart (`householdId` y `file`). |
 | `POST /v1/runs/{run_id}/confirm` | Confirma o corrige la fecha y persiste un recordatorio. |
+| `POST /v1/calendar/connect` | Inicia OAuth de Calendar para el usuario autenticado; devuelve URL de Google y vencimiento de `state`. |
+| `GET /v1/calendar/status` | Informa si el usuario autenticado conectó su cuenta. |
+| `DELETE /v1/calendar/connection` | Desconecta y elimina el refresh token cifrado del usuario. |
 
-Los endpoints `/v1/internal/scan` y `/v1/internal/report-result` son exclusivamente para el plugin. Se autentican con referencias aleatorias de vida limitada, no con tokens de usuario, y no forman parte del contrato para clientes.
+`GET /v1/calendar/oauth/callback` es el redirect URI configurado en Google; la API valida un `state` de un solo uso asociado al usuario y con vencimiento de 10 minutos, intercambia el código en servidor y redirige a una página limpia. El token no se devuelve al cliente ni se comparte con OpenClaw.
+
+Para consultar eventos, `POST /v1/runs` admite `calendar: {"startDate":"YYYY-MM-DD","endDate":"YYYY-MM-DD"}`. El rango es inclusivo, máximo 31 días, y se interpreta en la zona horaria del hogar. `calendar` no puede combinarse con `documentId`. El subagente consulta hasta 50 eventos del calendario principal y devuelve únicamente título, inicio, fin, indicador de día completo, zona horaria y si hay más resultados. La API verifica que lo reportado coincida con lo obtenido del proveedor.
+
+Los endpoints `/v1/internal/scan`, `/v1/internal/calendar/read` y `/v1/internal/report-result` son exclusivamente para el plugin. Se autentican con referencias aleatorias de vida limitada, no con tokens de usuario, y no forman parte del contrato para clientes.
+
+### Conectar una cuenta y consultar Google Calendar
+
+Solicita la URL de autorización con el token del usuario. Abre la URL devuelta en un navegador y completa el consentimiento de Google:
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/calendar/connect \
+  -H 'Authorization: Bearer alba-demo-token-change-me'
+```
+
+Comprueba la conexión:
+
+```bash
+curl http://127.0.0.1:8000/v1/calendar/status \
+  -H 'Authorization: Bearer alba-demo-token-change-me'
+```
+
+Luego crea una ejecución con fechas explícitas (incluye ambos extremos, hasta 31 días):
+
+```bash
+curl -i http://127.0.0.1:8000/v1/runs \
+  -H 'Authorization: Bearer alba-demo-token-change-me' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "householdId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "message": "Resume mis eventos próximos",
+    "calendar": {"startDate": "2027-03-28", "endDate": "2027-04-03"}
+  }'
+```
+
+Consulta el `runId` como en los hitos anteriores. El resultado conserva eventos normalizados a UTC y el campo `timeZone` del hogar; el agente lo devuelve al orquestador, y el backend solo acepta el resultado exacto que produjo la consulta. Para revocar la conexión desde Vita:
+
+```bash
+curl -X DELETE http://127.0.0.1:8000/v1/calendar/connection \
+  -H 'Authorization: Bearer alba-demo-token-change-me'
+```
 
 ## Hito 1: delegación y resultado estructurado
 
@@ -272,6 +321,10 @@ Las variables principales de `.env` son:
 | `OPENCLAW_TOKEN` | Token compartido con el Gateway privado. |
 | `OPENCLAW_AGENT_ID` | Agente inicial; por defecto `orquestador`. |
 | `OPENCLAW_TIMEOUT_SECONDS` | Límite de tiempo de la ejecución; por defecto 120 segundos. |
+| `GOOGLE_OAUTH_CLIENT_ID` | Client ID OAuth Web de Google; vacío desactiva Calendar. |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | Client secret OAuth; secreto privado solo para Vita. |
+| `GOOGLE_OAUTH_REDIRECT_URI` | URL callback OAuth autorizada en Google Cloud. |
+| `GOOGLE_TOKEN_ENCRYPTION_KEY` | Clave Fernet externa al repo que cifra refresh tokens en PostgreSQL. |
 | `VITA_MAX_UPLOAD_BYTES` | Máximo de bytes por imagen; por defecto 10 MiB. |
 | `VITA_MAX_IMAGE_DIMENSION` | Máximo por lado; por defecto 8000 píxeles. |
 | `VITA_MAX_IMAGE_PIXELS` | Máximo de píxeles totales; por defecto 20 millones. |

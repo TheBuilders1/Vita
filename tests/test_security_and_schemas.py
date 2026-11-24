@@ -43,6 +43,38 @@ def test_run_result_is_strict_and_date_is_real() -> None:
             {"status": "failed", "errorCode": "arbitrary"}
         )
 
+    with pytest.raises(ValidationError):
+        run_outcome_adapter.validate_python(
+            {"status": "failed", "errorCode": "calendar_api_error"}
+        )
+
+
+def test_calendar_result_has_a_strict_time_zone_and_bounded_events() -> None:
+    outcome = run_outcome_adapter.validate_python(
+        {
+            "status": "calendar_events",
+            "events": [],
+            "timeZone": "Europe/Madrid",
+            "startDate": "2027-03-28",
+            "endDate": "2027-03-30",
+            "truncated": False,
+        }
+    )
+
+    assert outcome.model_dump(mode="json", by_alias=True)["timeZone"] == "Europe/Madrid"
+
+    with pytest.raises(ValidationError):
+        run_outcome_adapter.validate_python(
+            {
+                "status": "calendar_events",
+                "events": [],
+                "timeZone": "Mars/Olympus",
+                "startDate": "2027-03-28",
+                "endDate": "2027-03-30",
+                "truncated": False,
+            }
+        )
+
 
 def test_client_cannot_supply_user_identity_or_invalid_confirmation() -> None:
     with pytest.raises(ValidationError):
