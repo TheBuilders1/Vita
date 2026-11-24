@@ -1,0 +1,59 @@
+@import 'tailwindcss';
+@import '@fontsource/atkinson-hyperlegible/latin-400.css';
+@import '@fontsource/atkinson-hyperlegible/latin-700.css';
+@import './tokens.css';
+
+@layer base {
+  :root { color-scheme: light; font-size: 112.5%; }
+  :root[data-text-size='large'] { font-size: 131.25%; }
+  :root[data-text-size='xlarge'] { font-size: 150%; }
+
+  body {
+    background: var(--color-yeso);
+    color: var(--color-tinta);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    min-height: 100dvh;
+  }
+  * { scrollbar-color: var(--color-borde) transparent; scrollbar-width: thin; }
+  h1, h2, h3 { line-height: 1.2; text-wrap: balance; overflow-wrap: anywhere; hyphens: auto; }
+  p, label, li, dd, legend { overflow-wrap: break-word; }
+  button, [role='button'], summary, label:has(input), select { cursor: pointer; }
+  :disabled { cursor: not-allowed; }
+  :focus-visible { outline: 3px solid var(--color-foco); outline-offset: 5px; }
+  .on-dark :focus-visible, .on-dark:focus-visible { outline-color: var(--color-foco-claro); }
+}
+
+@layer components {
+  /* Borde escalonado de píxel hecho con sombras: no recorta el foco como haría clip-path. */
+  .pixel-edge {
+    --edge: var(--color-borde);
+    --step: 3px;
+    margin: var(--step);
+    box-shadow:
+      0 calc(var(--step) * -1) 0 0 var(--edge), 0 var(--step) 0 0 var(--edge),
+      calc(var(--step) * -1) 0 0 0 var(--edge), var(--step) 0 0 0 var(--edge);
+  }
+  .backdrop { image-rendering: pixelated; }
+  [data-contrast='high'] .backdrop { display: none; }
+  .dialog-root::backdrop { background: rgb(22 34 56 / 0.62); }
+}
+
+/* Los colores forzados del sistema eliminan las sombras: hace falta un borde real. */
+@media (forced-colors: active) {
+  .pixel-edge { border: 2px solid ButtonBorder; }
+  /* Sin fondos propios, lo elegido y la pantalla actual no se distinguirían. */
+  [aria-current], [aria-pressed='true'], label:has(input:checked) { border: 4px solid Highlight; text-decoration: underline; }
+}
+
+/* El menú inferior del móvil no debe tapar lo que recibe el foco (WCAG 2.4.11). */
+@media (width < 48rem) {
+  html { scroll-padding-block: 1rem 6.5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { animation-duration: 1ms !important; transition-duration: 1ms !important; scroll-behavior: auto !important; }
+}
+[data-motion='reduced'] *, [data-motion='reduced'] ::before, [data-motion='reduced'] ::after {
+  animation-duration: 1ms !important; transition-duration: 1ms !important; scroll-behavior: auto !important;
+}

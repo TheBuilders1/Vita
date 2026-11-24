@@ -1,0 +1,30 @@
+import { useMemo, useState, type ReactNode } from 'react'
+import { useHome } from '@/app/providers/home'
+import type { RecordData } from '@/modules/fields'
+import { getRecordType } from '@/modules/registry'
+import { RecordDetail } from './RecordDetail'
+import { RecordFormDialog } from './RecordFormDialog'
+import { RecordEditorContext, type RecordEditor } from './editor'
+
+type State = { mode: 'create'; typeId: string; preset: RecordData } | { mode: 'detail' | 'edit'; id: string } | null
+
+/** Un único sitio para ver, crear y cambiar registros desde cualquier pantalla. */
+export function RecordEditorProvider({ children }: { children: ReactNode }) {
+  const { records } = useHome()
+  const [state, setState] = useState<State>(null)
+  const editor = useMemo<RecordEditor>(() => ({
+    create: (typeId, preset = {}) => setState({ mode: 'create', typeId, preset }),
+    open: (id) => setState({ mode: 'detail', id }),
+  }), [])
+  const close = () => setState(null)
+  const record = state && state.mode !== 'create' ? records.find((r) => r.id === state.id) : undefined
+
+  return (
+    <RecordEditorContext value={editor}>
+      {children}
+      {state?.mode === 'create' && <RecordFormDialog key={`new-${state.typeId}`} type={getRecordType(state.typeId)} preset={state.preset} onClose={close} />}
+      {state?.mode === 'edit' && record && <RecordFormDialog key={record.id} type={getRecordType(record.typeId)} record={record} onClose={() => setState({ mode: 'detail', id: record.id })} />}
+      {state?.mode === 'detail' && record && <RecordDetail key={record.id} record={record} onClose={close} onEdit={() => setState({ mode: 'edit', id: record.id })} />}
+    </RecordEditorContext>
+  )
+}
