@@ -144,3 +144,17 @@ export function extractTime(text: string): { rest: string; time?: string; proble
   const { value, problem, text: rest } = findTime({ plain: text, raw: text })
   return { rest: rest.plain, ...(value !== undefined && { time: value }), ...(problem !== undefined && { problem }) }
 }
+
+const REPEATS = [
+  ['daily', /\b(?:cada dia|todos los dias|a diario|diariamente)\b/],
+  ['weekly', new RegExp(`\\b(?:cada (?=${DAY}\\b)|cada semana\\b|semanalmente\\b)`)],
+  ['monthly', /\b(?:cada mes|todos los meses|mensualmente)\b/],
+  ['yearly', /\b(?:cada año|todos los años|anualmente)\b/],
+] as const
+
+export function findRepeat(text: Phrase) {
+  for (const [repeat, pattern] of REPEATS) {
+    if (pattern.test(text.plain)) return { repeat, text: without(text, pattern) }
+  }
+  return undefined
+}

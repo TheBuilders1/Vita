@@ -3,6 +3,7 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
+import { offlinePlugin } from './server/offline.ts'
 import { isAllowedCall, readApiConfig } from './server/apiGuard.ts'
 
 const header = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value)
@@ -11,8 +12,29 @@ export default defineConfig(({ command, mode }) => {
   // Solo al desarrollar: una versión publicada no tiene proxy y no debe ofrecer la lectura de fotos.
   const api = command === 'serve' && mode !== 'test' ? readApiConfig(loadEnv(mode, fileURLToPath(new URL('.', import.meta.url)), 'VITA_')) : null
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), offlinePlugin()],
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
+    build: {
+      rolldownOptions: {
+        plugins: [{
+          name: 'vita-three-catalogue',
+          // Canvas registra los tipos usados en JSX. El motor de R3F conserva sus propias importaciones.
+          resolveId: {
+            order: 'pre',
+            handler(source, importer) {
+              if (source === 'three' && importer?.endsWith('/@react-three/fiber/dist/react-three-fiber.esm.js')) {
+                return '\0vita-three-catalogue'
+              }
+            },
+          },
+          load(id) {
+            if (id === '\0vita-three-catalogue') {
+              return "export { DirectionalLight, HemisphereLight, Mesh, MeshBasicMaterial, PlaneGeometry } from 'three'"
+            }
+          },
+        }],
+      },
+    },
     define: { VITA_HOUSEHOLD: JSON.stringify(api?.household ?? null) },
     ...(api && {
       server: {

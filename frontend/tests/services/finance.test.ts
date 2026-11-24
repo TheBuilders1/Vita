@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { goalProgress, kidBalance, monthSummary, monthTrend } from '@/services/finance'
+import { budgetWarning, goalProgress, kidBalance, monthSummary, monthTrend } from '@/services/finance'
 import { buildRecord } from '../support/builders'
 
 let n = 0
@@ -37,4 +37,16 @@ test('el dinero de cada hijo separa lo disponible de lo ahorrado', () => {
   const move = (kind: string, amount: number, extra = {}) => rec('kidMovement', 'kidsMoney', { member: 'leo', concept: 'x', kind, amount, date: '2026-11-01', ...extra })
   const records = [move('income', 1000), move('expense', 250), move('saving', 300, { goal: 'g' }), move('income', 5000, { member: 'otra' })]
   expect(kidBalance('leo', records)).toEqual({ available: 450, saved: 300 })
+})
+
+test('el tope más reciente gana aunque la lista venga en otro orden', () => {
+  const latest = { ...rec('budget', 'finances', { category: 'food', limit: 2000 }), updatedAt: '2026-11-20T00:00:00Z' }
+  const old = { ...rec('budget', 'finances', { category: 'food', limit: 1000 }), updatedAt: '2026-11-01T00:00:00Z' }
+  expect(monthSummary([latest, old], '2026-11-24').categories).toEqual([{ category: 'food', spent: 0, limit: 2000 }])
+})
+
+test.each([
+  [799, undefined], [800, 'Te acercas al tope'], [1000, 'Te acercas al tope'], [1001, 'Has pasado el tope'],
+])('muestra el aviso adecuado al gastar %i de 1000', (spent, warning) => {
+  expect(budgetWarning({ category: 'food', spent, limit: 1000 })).toBe(warning)
 })

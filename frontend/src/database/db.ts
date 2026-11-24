@@ -1,6 +1,7 @@
 import { Dexie, type EntityTable } from 'dexie'
 import type { Family, Member } from '@/types/family'
 import type { FamilyRecord, StoredFile } from '@/types/records'
+import type { TrashEntry } from '@/types/trash'
 
 /** Preferencias de este dispositivo (sesión simulada, accesibilidad…). */
 export interface Setting { key: string; value: unknown }
@@ -12,6 +13,7 @@ export class VitaDb extends Dexie {
   records!: EntityTable<FamilyRecord, 'id'>
   files!: EntityTable<StoredFile, 'id'>
   settings!: EntityTable<Setting, 'key'>
+  trash!: EntityTable<TrashEntry, 'id'>
 
   constructor(name = 'vita') {
     super(name)
@@ -22,5 +24,6 @@ export class VitaDb extends Dexie {
       files: 'id, recordId',
       settings: 'key',
     })
+    this.version(2).stores({ trash: 'id, deletedAt' })
   }
 }

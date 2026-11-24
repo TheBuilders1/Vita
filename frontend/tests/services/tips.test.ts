@@ -50,8 +50,8 @@ describe('reglas', () => {
   test('presupuesto casi agotado', () => {
     const budget = rec('budget', 'finances', { category: 'food', limit: 1000 })
     const spend = (amount: number) => rec('transaction', 'finances', { kind: 'expense', concept: 'x', category: 'food', amount, date: '2026-11-02' })
-    expect(ids({ records: [contact, budget, spend(900)] })).toContain('budget')
-    expect(ids({ records: [contact, budget, spend(890)] })).not.toContain('budget')
+    expect(ids({ records: [contact, budget, spend(800)] })).toContain('budget')
+    expect(ids({ records: [contact, budget, spend(790)] })).not.toContain('budget')
   })
   test('medicación de ayer sin anotar', () => {
     const plan = rec('medicationPlan', 'medication', { member: 'ana', name: 'A', dose: '1', times: ['09:00'], weekdays: [], startDate: '2026-11-01' })

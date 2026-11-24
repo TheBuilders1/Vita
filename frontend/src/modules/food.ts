@@ -43,7 +43,7 @@ const diet = defineModule({
   description: 'Alergias, intolerancias y preferencias de cada persona.',
   recordTypes: [
     defineRecordType({
-      id: 'dietNeed', name: 'Necesidad alimentaria', plural: 'Necesidades alimentarias', titleField: 'title',
+      id: 'dietNeed', name: 'Alergia o dieta', plural: 'Alergias y dietas', titleField: 'title',
       fields: {
         member: { kind: 'member', label: 'Persona', required: true },
         title: { kind: 'text', label: 'Qué debemos tener en cuenta', required: true },

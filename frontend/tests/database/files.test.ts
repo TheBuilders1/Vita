@@ -99,3 +99,23 @@ test('el origen de la caducidad se guarda con el documento', async () => {
   const record = await home.records.create(home.marta, { typeId: 'document', data: { title: 'DNI', kind: 'id', files: [file.id], expiryDate: '2030-12-31', scannedDate: '2030-12-31', scannedFile: file.id } })
   expect((await home.records.get(home.marta, record.id))?.data).toMatchObject({ expiryDate: '2030-12-31', scannedDate: '2030-12-31', scannedFile: file.id })
 })
+
+test('duplicar un archivo da otro propio, sin tocar el original', async () => {
+  const file = await home.files.add(home.marta, new File(['hola'], 'nota.txt', { type: 'text/plain' }))
+  const record = await home.records.create(home.marta, { typeId: 'document', data: { title: 'Contrato', kind: 'contract', files: [file.id] } })
+  const copy = await home.files.copy(home.marta, file.id)
+  expect(copy).toMatchObject({ name: 'nota.txt', size: 4, uploadedBy: home.marta })
+  expect(copy!.id).not.toBe(file.id)
+  expect(copy!.recordId).toBeUndefined()
+  expect(await home.files.get(home.marta, file.id)).toMatchObject({ recordId: record.id })
+})
+test('no se duplica un archivo que no se puede ver', async () => {
+  const file = await home.files.add(home.marta, new File(['hola'], 'nota.txt', { type: 'text/plain' }))
+  expect(await home.files.copy(home.andres, file.id)).toBeUndefined()
+})
+
+test('un nombre larguísimo se acorta sin perder la extensión', async () => {
+  const file = await home.files.add(home.marta, new File(['hola'], `${'a'.repeat(400)}.txt`, { type: 'text/plain' }))
+  expect(file.name.length).toBeLessThanOrEqual(200)
+  expect(file.name.endsWith('….txt')).toBe(true)
+})

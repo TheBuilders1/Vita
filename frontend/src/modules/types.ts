@@ -13,7 +13,7 @@ export type ModuleId =
 
 export type Access = 'none' | 'read' | 'write'
 
-/** family: todos · restricted: autor, protagonistas, invitados y másteres · private: solo el autor. */
+/** family: todos · restricted: autor, protagonistas, invitados y admins · private: solo el autor. */
 export type Visibility = 'family' | 'restricted' | 'private'
 
 export type AgendaCategory =
@@ -30,7 +30,7 @@ export interface AgendaEntry {
   readonly timesField?: string
   readonly weekdaysField?: string
   readonly repeat?: 'daily' | 'yearly'
-  /** Select con valores none | weekly | monthly | yearly. */
+  /** Select con valores none | daily | weekly | monthly | yearly. */
   readonly repeatField?: string
   readonly untilField?: string
   /** Texto secundario: la dosis, el lugar… */
@@ -49,6 +49,8 @@ export interface RecordTypeInput<F extends Fields = Fields> {
   readonly titleField: keyof F & string
   readonly rules?: readonly Rule[]
   readonly visibility?: { readonly default: Visibility; readonly locked?: boolean }
+  /** Solo puede haber uno con el mismo valor en este campo (un tope por categoría). */
+  readonly uniqueBy?: keyof F & string
   /** Booleano que se cambia con la acción «completar». */
   readonly doneField?: keyof F & string
   /** Quien solo puede leer el módulo puede crear estos registros sobre sí mismo (p. ej. una toma). */
@@ -65,6 +67,7 @@ export interface RecordTypeDef {
   readonly titleField: string
   readonly schema: z.ZodType<RecordData>
   readonly visibility: { readonly default: Visibility; readonly locked: boolean }
+  readonly uniqueBy?: string
   readonly doneField?: string
   readonly selfLog: boolean
   readonly agenda?: readonly AgendaEntry[]

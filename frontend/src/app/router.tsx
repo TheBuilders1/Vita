@@ -30,6 +30,8 @@ export const router = createBrowserRouter([
               { path: '/hogar', lazy: async () => ({ Component: (await import('@/features/family/FamilyPage')).FamilyPage }) },
               { path: '/hogar/nuevo', lazy: async () => ({ Component: (await import('@/features/family/MemberPage')).NewMemberPage }) },
               { path: '/hogar/:memberId', lazy: async () => ({ Component: (await import('@/features/family/MemberPage')).MemberPage }) },
+              { path: '/buscar', lazy: async () => ({ Component: (await import('@/features/search/SearchPage')).SearchPage }) },
+              { path: '/ayuda', lazy: async () => ({ Component: (await import('@/features/help/HelpPage')).HelpPage }) },
               { path: '/ajustes', lazy: async () => ({ Component: (await import('@/features/settings/SettingsPage')).SettingsPage }) },
               { path: '/vita', lazy: async () => ({ Component: (await import('@/features/chat/ChatPage')).ChatPage }) },
               { path: '/planes', lazy: async () => ({ Component: (await import('@/features/plans/PlansPage')).PlansPage }) },
@@ -43,4 +45,4 @@ export const router = createBrowserRouter([
       { path: '*', element: <NotFoundPage /> },
     ],
   },
-])
+], { basename: import.meta.env.BASE_URL })

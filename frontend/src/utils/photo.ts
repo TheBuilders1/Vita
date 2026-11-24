@@ -6,10 +6,16 @@ import { resolveType } from './fileType'
 const MAX_SIDE = 2400
 const BIG_BYTES = 1.5 * 1024 * 1024
 const QUALITY = 0.85
+const PROFILE_SIDE = 256
 
 export function fitWithin(width: number, height: number): { width: number; height: number } {
   const scale = Math.min(1, MAX_SIDE / Math.max(width, height))
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) }
+}
+
+export function squareCrop(width: number, height: number): { x: number; y: number; side: number } {
+  const side = Math.min(width, height)
+  return { x: (width - side) / 2, y: (height - side) / 2, side }
 }
 
 /** HEIC no se ve en casi ningún navegador: se convierte siempre que este sepa leerlo. */
@@ -52,6 +58,35 @@ async function redraw(file: Blob, output: 'image/jpeg' | 'image/png'): Promise<B
 
 const UNREADABLE = 'Esta foto no se puede leer. Puede estar dañada: prueba con otra.'
 const HEIC = 'Esta foto está en formato HEIC y este navegador no sabe leerlo. Guárdala como JPG y vuelve a elegirla.'
+
+export async function prepareMemberPhoto(file: File): Promise<string> {
+  const type = await resolveType(file)
+  const heic = /^image\/(hei[cf])(?:-sequence)?$/.test(type) || /\.(heic|heif)$/i.test(file.name)
+  if (!type.startsWith('image/') && !heic) throw new ValidationError({ photo: 'Elige un archivo de imagen, por ejemplo una foto JPG o PNG.' })
+
+  const url = URL.createObjectURL(file)
+  try {
+    const image = new Image()
+    image.src = url
+    await image.decode()
+    const { x, y, side } = squareCrop(image.naturalWidth, image.naturalHeight)
+    const canvas = Object.assign(document.createElement('canvas'), { width: PROFILE_SIDE, height: PROFILE_SIDE })
+    const context = canvas.getContext('2d')
+    if (!context || !side) throw new ValidationError({ photo: UNREADABLE })
+    context.fillStyle = '#fff'
+    context.fillRect(0, 0, PROFILE_SIDE, PROFILE_SIDE)
+    // Al redibujarla se pierde la ubicación de la foto original.
+    context.drawImage(image, x, y, side, side, 0, 0, PROFILE_SIDE, PROFILE_SIDE)
+    const photo = canvas.toDataURL('image/jpeg', 0.8)
+    if (!photo.startsWith('data:image/jpeg;base64,')) throw new ValidationError({ photo: UNREADABLE })
+    return photo
+  } catch (error) {
+    if (error instanceof ValidationError) throw error
+    throw new ValidationError({ photo: heic ? HEIC : UNREADABLE })
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
 
 /** Deja la foto lista para guardar: sin la ubicación y, si es grande, reducida en vez de rechazada. Lo demás pasa igual. */
 export async function preparePhoto(file: File): Promise<File> {

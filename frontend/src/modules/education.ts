@@ -81,7 +81,7 @@ const development = defineModule({
   description: 'Etapas, hitos y momentos importantes del crecimiento.',
   recordTypes: [
     defineRecordType({
-      id: 'milestone', name: 'Hito', plural: 'Hitos', titleField: 'title',
+      id: 'milestone', name: 'Logro', plural: 'Logros', titleField: 'title',
       fields: {
         member: { kind: 'member', label: 'Niño o niña', required: true },
         title: { kind: 'text', label: 'Hito', required: true },

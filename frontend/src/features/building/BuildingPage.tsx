@@ -1,17 +1,21 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { CircleHelp } from 'lucide-react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Link, useNavigate, useParams } from 'react-router'
 import { useStore } from 'zustand'
 import { NotFoundPage } from '@/app/NotFoundPage'
 import { useHome } from '@/app/providers/home'
 import { FloorDirectory, floorButtonId, roomButtonId } from '@/components/navigation/FloorDirectory'
 import { LiftBar } from '@/components/navigation/LiftBar'
+import { CountBadge } from '@/components/ui/Badge'
+import { QuickActions } from '@/features/dashboard/QuickActions'
+import { StartCard } from '@/features/dashboard/StartCard'
 import { SummaryPanel } from '@/features/dashboard/SummaryPanel'
 import { useAttention } from '@/hooks/useAttention'
 import { useTitle } from '@/hooks/useTitle'
 import { FLOORS } from '@/modules/floors'
 import { MODULES } from '@/modules/registry'
 import type { FloorId, ModuleId } from '@/modules/types'
-import { pendingByModule } from '@/services/attention'
+import { isImmediate, pendingByModule } from '@/services/attention'
 import { accessTo } from '@/services/permissions'
 import { settingsStore } from '@/store'
 import { BuildingView } from '@/three/scene/BuildingView'
@@ -29,7 +33,7 @@ export function BuildingPage() {
   const attention = useAttention()
   const [hovered, setHovered] = useState<ModuleId | null>(null)
   const bigText = useStore(settingsStore, (s) => s.settings.textSize !== 'normal')
-  const [tab, setTab] = useState<'summary' | 'floors'>('summary')
+  const [tab, setTab] = useState<'summary' | 'floors'>('floors')
   const floor = FLOORS.find((f) => f.id === params.floorId) ?? null
   const module = ROOMS.find((m) => m.id === params.moduleId && m.floor === params.floorId) ?? null
 
@@ -42,6 +46,7 @@ export function BuildingPage() {
     }))
   }, [attention, family.enabledModules, actor])
 
+  const urgent = attention.filter(isImmediate).length
   const missing = (params.floorId && !floor) || (params.moduleId && !module)
   const title = missing ? undefined : (module?.name ?? floor?.name)
   useTitle(title)
@@ -111,13 +116,16 @@ export function BuildingPage() {
       <div className="relative lg:min-h-0 lg:overflow-y-auto lg:pr-1">
         {module && floor ? <ModulePanel module={module} floor={floor} enabled={rooms.some((r) => r.moduleId === module.id && r.enabled)} /> : (
           <>
+            <StartCard />
+            <QuickActions />
             <div className="mb-3 flex gap-1">
-              <TabButton active={!showFloors} onClick={openSummary}>Resumen</TabButton>
               <TabButton active={showFloors} onClick={openFloors}>Plantas</TabButton>
+              <TabButton active={!showFloors} onClick={openSummary}>Resumen<CountBadge count={urgent} label={urgent === 1 ? 'cosa que atender' : 'cosas que atender'} className="ml-2 bg-aviso-fondo text-tinta" /></TabButton>
             </div>
             {showFloors
               ? <FloorDirectory rooms={rooms} selected={floor?.id ?? null} hovered={hovered} onSelect={chooseFloor} onHover={setHovered} onSelectModule={selectModule} />
               : <SummaryPanel />}
+            <Link to="/ayuda" className="mt-3 inline-flex min-h-11 items-center gap-2 bg-crema px-3 font-bold underline underline-offset-4"><CircleHelp aria-hidden="true" className="size-5" />Ayuda</Link>
           </>
         )}
       </div>
@@ -125,7 +133,7 @@ export function BuildingPage() {
   )
 }
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: string }) {
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button type="button" aria-pressed={active} onClick={onClick} className={cx('min-h-12 min-w-0 flex-1 border-b-4 px-2 font-bold', active ? 'border-marino bg-crema' : 'border-borde bg-beige hover:bg-yeso')}>
       {children}

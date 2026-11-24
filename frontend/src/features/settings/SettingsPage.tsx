@@ -1,8 +1,9 @@
+import { CircleHelp } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { useHome } from '@/app/providers/home'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { Button } from '@/components/ui/Button'
+import { Button, ButtonLink } from '@/components/ui/Button'
 import { TextInput } from '@/components/ui/Field'
 import { Notice } from '@/components/ui/Notice'
 import { Panel } from '@/components/ui/Panel'
@@ -17,10 +18,12 @@ import { SERVER_HOUSEHOLD } from '@/services/homeServer'
 import { canManage } from '@/services/permissions'
 import { settingsStore, toastStore } from '@/store'
 import { BackupPanel } from './BackupPanel'
+import { DictationPanel } from './DictationPanel'
 import { ModulePicker } from './ModulePicker'
 import { PreferencesForm } from './PreferencesForm'
 import { ServerPanel } from './ServerPanel'
 import { StoragePanel } from './StoragePanel'
+import { TrashPanel } from './TrashPanel'
 
 function restoreTips() {
   const { show } = toastStore.getState()
@@ -43,7 +46,7 @@ export function SettingsPage() {
   }
   return (
     <div className="mx-auto grid w-full max-w-4xl grid-cols-1 gap-6">
-      <PageHeader title="Ajustes" description="Los cambios se guardan al momento en este dispositivo." />
+      <PageHeader title="Ajustes" description="Los cambios se guardan al momento en este dispositivo." action={<ButtonLink to="/ayuda" icon={CircleHelp}>Ayuda</ButtonLink>} />
       <Panel title="Lectura y movimiento"><PreferencesForm /></Panel>
       <Panel title="Número de emergencias"><EmergencyNumber /></Panel>
       {canManage(actor, 'modules') && (
@@ -56,6 +59,8 @@ export function SettingsPage() {
       )}
       {canManage(actor, 'data') && <BackupPanel />}
       {SERVER_HOUSEHOLD !== null && canManage(actor, 'data') && <ServerPanel />}
+      <DictationPanel />
+      <TrashPanel />
       <StoragePanel />
       <Panel title="Consejos">
         <p className="mb-3">Vuelve a enseñar los consejos que habías descartado.</p>

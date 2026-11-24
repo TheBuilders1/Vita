@@ -1,10 +1,22 @@
 import { describe, expect, test } from 'vitest'
 import { familyInputSchema, memberInputSchema } from '@/types/family'
+import { memberPhoto } from '../support/memberPhoto'
 
 const member = { name: 'Marta', birthDate: '1981-03-04', relationship: 'Madre', role: 'master' }
 const firstMessage = (input: unknown) => memberInputSchema('2026-11-24').safeParse(input).error?.issues[0]?.message
 
 describe('integrantes', () => {
+  test('conserva una foto JPEG válida', () => {
+    expect(memberInputSchema('2026-11-24').parse({ ...member, photo: memberPhoto }).photo).toBe(memberPhoto)
+  })
+  test.each([
+    ['otro formato', memberPhoto.replace('jpeg', 'png')],
+    ['base64 dañado', 'data:image/jpeg;base64,?'],
+    ['datos que no son JPEG', 'data:image/jpeg;base64,AAAA'],
+    ['una foto demasiado grande', `data:image/jpeg;base64,${'/9j/'.repeat(100_000)}/9k=`],
+  ])('rechaza %s como foto', (_reason, photo) => {
+    expect(memberInputSchema('2026-11-24').safeParse({ ...member, photo }).error?.issues[0]?.path).toEqual(['photo'])
+  })
   test('acepta lo mínimo y completa los valores por defecto', () => {
     expect(memberInputSchema('2026-11-24').parse(member)).toEqual({ ...member, needs: [], moduleAccess: {} })
   })

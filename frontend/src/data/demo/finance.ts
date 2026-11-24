@@ -8,7 +8,7 @@ export async function financeDemo({ add, day, marta, andres, leo, pilar, today }
   await add(marta, 'transaction', { kind: 'expense', concept: 'Compra semanal', amount: 11840, category: 'food', date: today })
   await add(marta, 'transaction', { kind: 'expense', concept: 'Luz y agua', amount: 13260, category: 'home', date: monthStart, repeat: 'monthly' })
   await add(marta, 'transaction', { kind: 'expense', concept: 'Zapatillas de Leo', amount: 3990, category: 'clothing', date: today })
-  await add(marta, 'budget', { category: 'food', limit: 52000 })
+  await add(marta, 'budget', { category: 'food', limit: 14000 })
   await add(marta, 'budget', { category: 'leisure', limit: 18000 })
   const trip = await add(marta, 'savingsGoal', { name: 'Vacaciones en la costa', target: 150000, deadline: day(200) })
   await add(marta, 'savingsContribution', { goal: trip, amount: 40000, date: day(-40), contributor: marta })

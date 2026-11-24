@@ -9,6 +9,8 @@ import { useRecordEditor } from '@/features/records/editor'
 import { VISIBILITY_LABELS } from '@/features/records/labels'
 import { getModule, getRecordType } from '@/modules/registry'
 import type { Proposal } from '@/services/chat'
+import { canCreate } from '@/services/permissions'
+import { subjectsOf } from '@/services/integrity'
 import { describeError } from '@/services/errors'
 import { fieldText, titleContext } from '@/services/titles'
 import type { CardStatus } from '@/store/chatStore'
@@ -18,11 +20,12 @@ import { WEEKDAYS } from '@/utils/format'
 
 /** Lo que Vita ha entendido, para revisarlo. Solo se guarda al pulsar. */
 export function ProposalCard({ proposal, status, onStatus }: { proposal: Proposal; status: CardStatus | undefined; onStatus: (status: CardStatus) => void }) {
-  const { actor, members, records } = useHome()
+  const { actor, family, members, records } = useHome()
   const editor = useRecordEditor()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const type = getRecordType(proposal.typeId)
+  const canSave = family.enabledModules.includes(type.moduleId) && canCreate(actor, type.id, subjectsOf(type.id, proposal.data))
   const context = titleContext(members, records)
   const draft: FamilyRecord = { id: 'propuesta', typeId: type.id, moduleId: type.moduleId, ownerId: actor.id, subjectIds: [], visibility: type.visibility.default, sharedWith: [], data: proposal.data, createdAt: '', updatedAt: '' }
   const rows = Object.entries(type.fields).flatMap(([name, field]) => {
@@ -43,13 +46,13 @@ export function ProposalCard({ proposal, status, onStatus }: { proposal: Proposa
     setBusy(false)
   }
   const save = () => attempt(async () => ({ state: 'saved', recordId: (await repositories.records.create(actor.id, { typeId: type.id, data: proposal.data })).id }))
-  const undo = (id: string) => attempt(async () => { await repositories.records.remove(actor.id, id); return { state: 'undone' } })
+  const undo = (id: string) => attempt(async () => { await repositories.records.erase(actor.id, id); return { state: 'undone' } })
   // Una vez abierto en el formulario no se ofrece «Guardar» aquí: se guardaría dos veces.
   const edit = () => { onStatus({ state: 'editing' }); editor.create(type.id, proposal.data) }
 
   return (
-    <div className="border-2 border-marino bg-crema p-4">
-      <h3 className="flex items-center gap-3 text-lg font-bold"><ModuleIcon id={type.moduleId} className="size-6" />{type.name}</h3>
+    <div className="min-w-0 border-2 border-marino bg-crema p-4 max-[24rem]:p-2">
+      <h2 className="flex items-center gap-3 text-lg font-bold"><ModuleIcon id={type.moduleId} className="size-6" />{type.name}</h2>
       <dl className="mt-2 grid grid-cols-1 gap-2">
         {rows.map((r) => <div key={r.name}><dt className="inline font-bold">{r.label}: </dt><dd className="inline break-words">{r.text}</dd></div>)}
         <div><dt className="inline font-bold">Quién puede verlo: </dt><dd className="inline">{VISIBILITY_LABELS[type.visibility.default].label}</dd></div>
@@ -68,12 +71,12 @@ export function ProposalCard({ proposal, status, onStatus }: { proposal: Proposa
             <Button icon={ExternalLink} disabled={busy} onClick={() => editor.open(status.recordId)}>Abrir</Button>
             <Button icon={Undo2} disabled={busy} onClick={() => { void undo(status.recordId) }}>Deshacer</Button>
           </>
-        ) : (
+        ) : canSave ? (
           <>
             {proposal.ready && status?.state !== 'editing' && <Button variant="confirm" icon={Check} disabled={busy} onClick={() => { void save() }}>Guardar<span className="sr-only"> {type.name.toLowerCase()}</span></Button>}
             <Button icon={Pencil} disabled={busy} onClick={edit}>{status?.state === 'editing' ? 'Volver a abrir' : proposal.ready ? 'Cambiar' : 'Completar'}<span className="sr-only"> {type.name.toLowerCase()}</span></Button>
           </>
-        )}
+        ) : <p>Tu perfil ya no puede guardar aquí.</p>}
       </div>
     </div>
   )

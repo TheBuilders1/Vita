@@ -1,6 +1,8 @@
 import { defineModule, defineRecordType, notBefore, options } from './define'
 
-/** Tareas y eventos de toda la familia: alimentan el resumen y no viven en ninguna planta. */
+const REPEAT_PERIODS = { weekly: 'Cada semana', monthly: 'Cada mes', yearly: 'Cada año' }
+
+/** Tareas y eventos de todo el hogar: alimentan el resumen y no viven en ninguna planta. */
 const planner = defineModule({
   id: 'planner', floor: null, name: 'Tareas y eventos', essential: true,
   description: 'Lo que hay que hacer y lo que está por venir.',
@@ -12,11 +14,26 @@ const planner = defineModule({
         title: { kind: 'text', label: 'Tarea', required: true },
         members: { kind: 'members', label: 'Quién se encarga' },
         dueDate: { kind: 'date', label: 'Para cuándo' },
+        time: { kind: 'time', label: 'Hora' },
+        repeat: { kind: 'select', label: 'Se repite', options: options({ none: 'No', daily: 'Cada día', ...REPEAT_PERIODS }) },
+        until: { kind: 'date', label: 'Se repite hasta' },
+        repeatAnchor: { kind: 'date', label: 'Fecha inicial de repetición', hidden: true },
         priority: { kind: 'select', label: 'Prioridad', options: options({ low: 'Baja', normal: 'Normal', high: 'Alta' }) },
         done: { kind: 'boolean', label: 'Hecha' },
         notes: { kind: 'textarea', label: 'Notas' },
       },
-      agenda: [{ dateField: 'dueDate', category: 'reminder' }],
+      rules: [
+        {
+          field: 'dueDate', message: 'Indica «Para cuándo» para poner una hora o repetir la tarea',
+          valid: ({ dueDate, time, repeat }) => dueDate !== undefined || (time === undefined && (repeat === undefined || repeat === 'none')),
+        },
+        {
+          field: 'until', message: 'Elige cómo se repite antes de poner una fecha de fin',
+          valid: ({ repeat, until }) => until === undefined || (repeat !== undefined && repeat !== 'none'),
+        },
+        notBefore('dueDate', 'until', 'La repetición no puede acabar antes de «Para cuándo»'),
+      ],
+      agenda: [{ dateField: 'dueDate', timeField: 'time', repeatField: 'repeat', untilField: 'until', category: 'reminder' }],
     }),
     defineRecordType({
       id: 'event', name: 'Evento', plural: 'Eventos', titleField: 'title',
@@ -25,7 +42,7 @@ const planner = defineModule({
         date: { kind: 'date', label: 'Fecha', required: true },
         endDate: { kind: 'date', label: 'Hasta' },
         time: { kind: 'time', label: 'Hora' },
-        repeat: { kind: 'select', label: 'Se repite', options: options({ none: 'No', weekly: 'Cada semana', monthly: 'Cada mes', yearly: 'Cada año' }) },
+        repeat: { kind: 'select', label: 'Se repite', options: options({ none: 'No', ...REPEAT_PERIODS }) },
         until: { kind: 'date', label: 'Se repite hasta' },
         members: { kind: 'members', label: 'Quién participa' },
         place: { kind: 'text', label: 'Lugar' },

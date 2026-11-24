@@ -2,6 +2,7 @@ import { UserPlus } from 'lucide-react'
 import { Link } from 'react-router'
 import { useHome } from '@/app/providers/home'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { Avatar } from '@/components/ui/Avatar'
 import { ButtonLink } from '@/components/ui/Button'
 import { Notice } from '@/components/ui/Notice'
 import { Panel } from '@/components/ui/Panel'
@@ -11,19 +12,23 @@ import { canManage } from '@/services/permissions'
 import type { Member } from '@/types/family'
 import { ageOn } from '@/utils/dates'
 import { ageText, NEED_LABELS, ROLE_LABELS, ROLE_OPTIONS } from './labels'
+import { RoleSelect } from './RoleSelect'
 
 export function FamilyPage() {
   const { family, members, actor, records } = useHome()
   const pets = records.filter((r) => r.typeId === 'pet')
+  const manages = canManage(actor, 'family')
+  const admins = members.filter((m) => canManage(m, 'family')).map((m) => m.name).join(', ')
   useTitle('Mi hogar')
   return (
     <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-6">
       <PageHeader
         title={family.name}
-        description={`Sois ${members.length} ${members.length === 1 ? 'persona' : 'personas'} en este hogar.`}
-        action={canManage(actor, 'family') && <ButtonLink to="/hogar/nuevo" variant="primary" icon={UserPlus}>Añadir integrante</ButtonLink>}
+        description={`Sois ${members.length} ${members.length === 1 ? 'persona' : 'personas'} en este hogar. ${manages ? 'Lo administras tú.' : `Lo administra: ${admins}.`}`}
+        action={manages && <ButtonLink to="/hogar/nuevo" variant="primary" size="lg" icon={UserPlus}>Añadir persona</ButtonLink>}
       />
-      <ul className="bg-crema shadow-panel">{members.map((m) => <MemberRow key={m.id} member={m} isActor={m.id === actor.id} />)}</ul>
+      <h2 className="text-xl font-bold">{manages ? 'Administrar perfiles' : 'Personas'}</h2>
+      <ul className="bg-crema shadow-panel">{members.map((m) => <MemberRow key={m.id} member={m} isActor={m.id === actor.id} manages={manages} />)}</ul>
       {pets.length > 0 && (
         <Panel title="Mascotas">
           <ul>{pets.map((p) => <li key={p.id}><strong>{String(p.data.name)}</strong>, {String(p.data.species).toLowerCase()}</li>)}</ul>
@@ -38,17 +43,18 @@ export function FamilyPage() {
   )
 }
 
-function MemberRow({ member, isActor }: { member: Member; isActor: boolean }) {
+function MemberRow({ member, isActor, manages }: { member: Member; isActor: boolean; manages: boolean }) {
   const today = useToday()
   return (
     <li className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-beige p-5 last:border-0">
-      <span aria-hidden="true" className="pixel-edge grid size-14 place-items-center bg-beige text-2xl font-bold">{member.name.charAt(0).toUpperCase()}</span>
-      <div className="min-w-0 flex-1 basis-40">
-        <h2 className="text-xl font-bold">{member.name}{isActor && <span className="font-normal text-apagado"> (perfil activo)</span>}</h2>
+      <Avatar name={member.name} photo={member.photo} />
+      <div className="min-w-0 flex-1 basis-40 [overflow-wrap:anywhere] max-[24rem]:basis-0">
+        <h3 className="text-xl font-bold">{member.name}{isActor && <span className="font-normal text-apagado"> (perfil activo)</span>}</h3>
         <p>{member.relationship}, {ageText(ageOn(member.birthDate, today))}. {ROLE_LABELS[member.role]}.</p>
         {member.needs.length > 0 && <p className="text-apagado">{member.needs.map((n) => NEED_LABELS[n]).join('. ')}.</p>}
       </div>
-      <ButtonLink to={`/hogar/${member.id}`}>Ver perfil<span className="sr-only"> de {member.name}</span></ButtonLink>
+      {manages && <div className="min-w-0 max-w-full basis-56 [overflow-wrap:anywhere]"><RoleSelect member={member} /></div>}
+      <ButtonLink to={`/hogar/${member.id}`}>{manages ? 'Datos y permisos' : 'Ver perfil'}<span className="sr-only"> de {member.name}</span></ButtonLink>
     </li>
   )
 }

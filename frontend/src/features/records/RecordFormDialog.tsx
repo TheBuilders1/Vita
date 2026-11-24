@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { Controller, useForm, type Resolver } from 'react-hook-form'
+import { Controller, useForm, useWatch, type Resolver } from 'react-hook-form'
 import { useHome } from '@/app/providers/home'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
@@ -17,16 +17,22 @@ import type { FamilyRecord } from '@/types/records'
 import { FieldControl } from './FieldControl'
 import { VisibilityInput } from './VisibilityInput'
 
-interface RecordFormProps { type: RecordTypeDef; record?: FamilyRecord; preset?: RecordData; onClose: () => void }
+interface RecordFormProps { type: RecordTypeDef; record?: FamilyRecord; preset?: RecordData; copyOf?: FamilyRecord | undefined; onClose: () => void }
 
-export function RecordFormDialog({ type, record, preset, onClose }: RecordFormProps) {
+export function RecordFormDialog({ type, record, preset, copyOf, onClose }: RecordFormProps) {
   const { actor, members } = useHome()
   const today = useToday()
   const form = useRef<HTMLFormElement>(null)
   const [failure, setFailure] = useState<string>()
   const [leaving, setLeaving] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [sharing, setSharing] = useState({ visibility: record?.visibility ?? type.visibility.default, sharedWith: record?.sharedWith ?? [], touched: false })
+  // Lo que había al abrir: si alguien lo cambia entretanto, guardar lo pisaría.
+  const [opened] = useState((record ?? copyOf)?.updatedAt)
+  const [sharing, setSharing] = useState(() => {
+    // La copia la ven las mismas personas: si no, duplicar algo reservado lo enseñaría.
+    const like = record ?? copyOf
+    return { visibility: like?.visibility ?? type.visibility.default, sharedWith: like?.sharedWith ?? [], touched: false }
+  })
 
   // Quien solo puede anotar lo suyo no elige a otra persona.
   const onlySelf = accessTo(actor, type.moduleId) !== 'write'
@@ -36,15 +42,17 @@ export function RecordFormDialog({ type, record, preset, onClose }: RecordFormPr
     resolver: zodResolver(type.schema as never) as unknown as Resolver<RecordData>,
     defaultValues: initial,
   })
+  const member: unknown = useWatch({ control, name: 'member' })
 
   const save = async (data: RecordData) => {
     // Con Intro se puede enviar aunque el botón esté desactivado.
     if (uploading) return
     setFailure(undefined)
-    const { visibility, sharedWith } = sharing
+    // Sin tocarlo no se envía: quien lo abrió antes desharía un cambio de privacidad de otra persona.
+    const access = sharing.touched ? { visibility: sharing.visibility, sharedWith: sharing.sharedWith } : {}
     try {
-      if (record) await repositories.records.update(actor.id, record.id, { data, visibility, sharedWith })
-      else await repositories.records.create(actor.id, { typeId: type.id, data, visibility, sharedWith })
+      if (record) await repositories.records.update(actor.id, record.id, { data, ...access, ...(opened && { ifUnchanged: opened }) })
+      else await repositories.records.create(actor.id, { typeId: type.id, data, ...access, ...(copyOf && { copyOf: copyOf.id, ...(sharing.touched && opened && { ifUnchanged: opened }) }) })
       toastStore.getState().show(`Guardado: ${type.name.toLowerCase()}`)
       onClose()
     } catch (error) {
@@ -67,7 +75,7 @@ export function RecordFormDialog({ type, record, preset, onClose }: RecordFormPr
     <Dialog
       open
       onClose={requestClose}
-      title={record ? `Cambiar ${type.name.toLowerCase()}` : `Añadir ${type.name.toLowerCase()}`}
+      title={`${record ? 'Cambiar' : copyOf ? 'Duplicar' : 'Añadir'} ${type.name.toLowerCase()}`}
       error={failure}
       // Las claves impiden que React recicle «Seguir editando» como botón de envío en pleno clic: guardaría sin querer.
       footer={leaving ? (
@@ -84,9 +92,10 @@ export function RecordFormDialog({ type, record, preset, onClose }: RecordFormPr
       )}
     >
       <form id="record-form" ref={form} noValidate onSubmit={(e) => { void handleSubmit(save, focusFirstError)(e) }} className="grid grid-cols-1 gap-5">
+        {copyOf && <Notice>Es una copia. Cambia lo que haga falta y guárdala: el original no se toca.</Notice>}
         {Object.entries(type.fields).filter(([, field]) => !field.hidden).map(([name, field]) => (
           <Controller key={name} control={control} name={name} render={({ field: { value, onChange, ref } }) => (
-            <FieldControl field={field} value={value} error={firstMessage(errors[name])} people={people} inputRef={ref} onChange={onChange} onBusy={setUploading} />
+            <FieldControl field={field} value={value} error={firstMessage(errors[name])} people={people} member={member} inputRef={ref} onChange={onChange} onBusy={setUploading} locked={isSubmitting} />
           )} />
         ))}
         {type.visibility.locked

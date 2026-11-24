@@ -9,7 +9,8 @@ export function RootLayout() {
     <>
       <SkipLink />
       <Outlet />
-      <ScrollRestoration />
+      {/* Al entrar por una dirección todas las pantallas comparten clave: una aparecería desplazada como la otra. */}
+      <ScrollRestoration getKey={({ key, pathname }) => (key === 'default' ? pathname : key)} />
       <RouteAnnouncer />
     </>
   )

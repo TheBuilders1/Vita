@@ -4,10 +4,10 @@ import type { Member } from '@/types/family'
 import type { FamilyRecord } from '@/types/records'
 import { addDays, ageOn, diffDays } from '@/utils/dates'
 import { buildAgenda } from './agenda'
-import { monthSummary } from './finance'
+import { budgetAmounts, budgetWarning, categoryName, monthSummary } from './finance'
 import { suggestModules } from './onboarding'
 import { hasSevere, rankRecipes } from './recipes'
-import { fieldText, recordTitle, titleContext } from './titles'
+import { recordTitle, titleContext } from './titles'
 
 /** health y finance se muestran siempre como orientación, nunca como consejo profesional. */
 export interface Tip {
@@ -85,12 +85,15 @@ const RULES: readonly Rule[] = [
     return [{ id: `recipe:${best.recipe.id}:${today}`, moduleId: 'fridge', title: `Aprovecha lo que caduca: ${String(best.recipe.data.title)}`, text: `Usa ${best.have.join(', ').toLowerCase()}. No choca con las alergias e intolerancias registradas, pero revisa siempre las etiquetas.` }]
   },
   function tightBudgets({ records, today }) {
-    const budgets = ofType(records, 'budget')
-    return monthSummary(records, today).categories.flatMap(({ category, spent, limit }) => {
-      const budget = budgets.find((b) => b.data.category === category)
-      if (!limit || !budget || spent < limit * 0.9) return []
-      const name = fieldText(budget, 'category', titleContext([], []))
-      return [{ id: `budget:${category}:${today.slice(0, 7)}`, moduleId: 'finances' as const, title: `Revisa el presupuesto de ${name.toLowerCase()}`, text: spent > limit ? 'Este mes ya se ha superado.' : 'Este mes queda menos de una décima parte.' }]
+    return monthSummary(records, today).categories.flatMap((item) => {
+      const { category, spent, limit } = item
+      const warning = budgetWarning(item)
+      if (!warning || limit === undefined) return []
+      const level = spent > limit ? 'over' : 'near'
+      return [{
+        id: `budget:${category}:${today.slice(0, 7)}:${level}`, moduleId: 'finances' as const,
+        title: warning, text: `${categoryName(category)}. Este mes lleváis ${budgetAmounts(spent, limit)}.`,
+      }]
     })
   },
   function schoolTomorrow({ records, today }) {

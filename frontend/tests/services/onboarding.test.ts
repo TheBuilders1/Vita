@@ -100,7 +100,7 @@ describe('validación por pasos', () => {
     expect(Object.keys(validateStep(d, 'members', today))).toEqual(['members.1.name'])
   })
   test('hace falta al menos un máster', () => {
-    expect(validateStep(draft({ members: [person({ role: 'member' })] }), 'roles', today)).toEqual({ roles: 'Elige al menos un máster: es quien administra el hogar' })
+    expect(validateStep(draft({ members: [person({ role: 'member' })] }), 'roles', today)).toEqual({ roles: 'Elige al menos un admin: es quien administra el hogar' })
   })
 })
 

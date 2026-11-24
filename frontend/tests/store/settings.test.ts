@@ -61,3 +61,11 @@ test('leer fotos en el servidor viene apagado y hay que activarlo', async () => 
   await db.settings.put({ key: 'preferences', value: { photoReading: 'si' } })
   expect((await repo.load()).photoReading).toBe(false)
 })
+
+test('el dictado está apagado hasta que alguien lo activa, también con preferencias antiguas o dañadas', async () => {
+  const db = new VitaDb('vita-dictado')
+  const repo = createSettingsRepository(db)
+  expect((await repo.load()).dictation).toBe('off')
+  await db.settings.put({ key: 'preferences', value: { textSize: 'large', dictation: true } })
+  expect(await repo.load()).toMatchObject({ textSize: 'large', dictation: 'off' })
+})

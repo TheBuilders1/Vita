@@ -16,7 +16,7 @@ const NOTICE: Record<AgendaCategory, number> = {
 const NOTICE_BY_TYPE: Readonly<Record<string, number>> = { document: 60, foodItem: 3, grant: 21, careRoutine: 0 }
 
 /** Lo que sigue pendiente aunque haya pasado su fecha. Una cita pasada, en cambio, ya pasó. */
-const STAYS_PENDING = new Set(['task', 'safetyCheck', 'document', 'foodItem', 'grant', 'vaccine', 'careNeed', 'device', 'socialAccount'])
+const STAYS_PENDING = new Set(['safetyCheck', 'document', 'foodItem', 'grant', 'vaccine', 'careNeed', 'device', 'socialAccount'])
 const LOOK_BACK_DAYS = 3650
 
 function isSettled(record: FamilyRecord, all: readonly FamilyRecord[]): boolean {
@@ -47,12 +47,19 @@ export interface AttentionQuery { readonly records: readonly FamilyRecord[]; rea
 export function buildAttention({ records, members, today }: AttentionQuery): AttentionItem[] {
   // Los registros resueltos se quitan como origen, pero los demás se conservan: las tomas marcan sus dosis.
   const open = records.filter((r) => !isSettled(r, records))
-  const ahead = buildAgenda({ records: open, members, from: today, to: addDays(today, Math.max(...Object.values(NOTICE_BY_TYPE), ...Object.values(NOTICE))) })
-  const late = buildAgenda({ records: open.filter((r) => STAYS_PENDING.has(r.typeId)), members: [], from: addDays(today, -LOOK_BACK_DAYS), to: addDays(today, -1) })
+  const yesterday = addDays(today, -1)
+  const ahead = buildAgenda({
+    records: open, members, from: today, to: addDays(today, Math.max(...Object.values(NOTICE_BY_TYPE), ...Object.values(NOTICE))),
+    taskPreviews: false,
+  })
+  const late = buildAgenda({ records: open.filter((r) => STAYS_PENDING.has(r.typeId)), members: [], from: addDays(today, -LOOK_BACK_DAYS), to: yesterday })
+  const lateTasks = open.filter((r) => r.typeId === 'task' && !r.data.done && typeof r.data.dueDate === 'string' && r.data.dueDate < today)
+  const oldestTask = lateTasks.reduce((oldest, r) => String(r.data.dueDate) < oldest ? String(r.data.dueDate) : oldest, today)
+  const overdue = buildAgenda({ records: lateTasks, members: [], from: oldestTask, to: yesterday, taskPreviews: false })
 
   // Que un plazo se abriera es una noticia pasada; que se cerrara sin presentarlo, no.
   const missed = late.filter((item) => item.typeId !== 'grant' || item.category === 'deadline')
-  const dated = [...missed, ...ahead]
+  const dated = [...overdue, ...missed, ...ahead]
     .filter((item) => !item.done && diffDays(today, item.date) <= noticeOf(item))
     .map((item) => ({ id: item.key, when: whenOf(item, today), item }))
   const undated = open
@@ -68,9 +75,11 @@ export function buildAttention({ records, members, today }: AttentionQuery): Att
 /** Solo lo inmediato: si casi todas las habitaciones tuvieran aviso, ninguno llamaría la atención. */
 const IMMEDIATE: readonly When[] = ['overdue', 'today', 'tomorrow']
 
+export const isImmediate = ({ when }: AttentionItem) => IMMEDIATE.includes(when)
+
 export function pendingByModule(items: readonly AttentionItem[]): Map<ModuleId, number> {
   const counts = new Map<ModuleId, number>()
-  for (const { when, item } of items) if (IMMEDIATE.includes(when)) counts.set(item.moduleId, (counts.get(item.moduleId) ?? 0) + 1)
+  for (const entry of items) if (isImmediate(entry)) counts.set(entry.item.moduleId, (counts.get(entry.item.moduleId) ?? 0) + 1)
   return counts
 }
 

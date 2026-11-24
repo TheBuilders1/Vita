@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import { VitaDb } from '@/database/db'
 import { createRepositories } from '@/database/repositories'
 import { openTestHome } from '../support/database'
+import { memberPhoto } from '../support/memberPhoto'
 
 let home: Awaited<ReturnType<typeof openTestHome>>
 let n = 0
@@ -13,7 +14,7 @@ beforeEach(async () => {
   await home.records.create(home.andres, { typeId: 'task', data: { title: 'Secreta' }, visibility: 'private' })
 })
 const backup = async () => JSON.stringify(await home.backup.export(home.marta))
-interface Loose { version: number; members: { role: string }[]; records: { typeId: string; ownerId: string; moduleId: string; subjectIds: string[]; data: Record<string, unknown> }[]; files: { mime: string }[] }
+interface Loose { version: number; members: { role: string; photo?: string }[]; records: { typeId: string; ownerId: string; moduleId: string; subjectIds: string[]; data: Record<string, unknown> }[]; files: { mime: string }[] }
 const broken = async (change: (data: Loose) => void) => { const data = JSON.parse(await backup()) as Loose; change(data); return JSON.stringify(data) }
 
 describe('exportar', () => {
@@ -28,6 +29,22 @@ describe('exportar', () => {
 })
 
 describe('restaurar', () => {
+  test('una copia con un nombre de archivo larguísimo se abre', async () => {
+    const text = await broken((d) => { (d.files[0] as unknown as { name: string }).name = `${'a'.repeat(900)}.pdf` })
+    await home.backup.restore(home.marta, text)
+    expect((await home.db.files.toArray())[0]!.name.length).toBeLessThanOrEqual(200)
+  })
+  test('una versión que no existe no se abre', async () => {
+    for (const version of [0, 1.5, -1]) await expect(home.backup.restore(home.marta, await broken((d) => { d.version = version }))).rejects.toThrow('dañada')
+  })
+  test('conserva la foto al restaurar una copia de versión 3', async () => {
+    await home.family.updateMember(home.marta, home.marta, { photo: memberPhoto })
+    const copy = await home.backup.export(home.marta)
+    const other = fresh()
+    await other.backup.restore(null, JSON.stringify(copy))
+    expect(copy.version).toBe(3)
+    expect((await other.db.members.get(home.marta))?.photo).toBe(memberPhoto)
+  })
   test('en otro dispositivo queda todo idéntico, archivos incluidos', async () => {
     const other = fresh()
     await other.backup.restore(null, await backup())
@@ -60,16 +77,22 @@ describe('restaurar', () => {
     ['no tiene máster', () => broken((d) => { for (const m of d.members) m.role = 'member' }), 'La copia está dañada'],
     ['repite identificadores', () => broken((d) => { d.records.push(d.records[0]!) }), 'La copia está dañada'],
     ['trae un archivo ejecutable', () => broken((d) => { d.files[0]!.mime = 'text/html' }), 'La copia está dañada'],
+    ['trae una foto de perfil dañada', () => broken((d) => { for (const m of d.members) m.photo = 'data:image/jpeg;base64,AAAA' }), 'La copia está dañada'],
   ])('si %s no toca nada', async (_name, make, message) => {
     const before = await home.db.records.toArray()
     await expect(home.backup.restore(home.marta, await make())).rejects.toThrow(message)
     expect(await home.db.records.toArray()).toEqual(before)
     expect(await home.db.files.count()).toBe(1)
   })
-  test('una copia de la versión anterior, sin enlaces, se recupera', async () => {
+  test('una copia de versión 1, sin enlaces, se recupera', async () => {
     await home.backup.restore(home.marta, await broken((d) => { d.version = 1; for (const r of d.records) delete r.data.links }))
     const doc = (await home.db.records.toArray()).find((r) => r.typeId === 'document')!
     expect(doc.data.links).toEqual([])
+  })
+  test('una copia de versión 2, sin fotos, se recupera', async () => {
+    const other = fresh()
+    await other.backup.restore(null, await broken((d) => { d.version = 2 }))
+    expect(await other.family.listMembers()).toEqual(await home.family.listMembers())
   })
   test('los permisos derivados no se creen: se recalculan', async () => {
     await home.backup.restore(home.marta, await broken((d) => { const doc = d.records.find((r) => r.typeId === 'document')!; doc.subjectIds = [home.nora]; doc.moduleId = 'album' }))
@@ -87,4 +110,15 @@ describe('consejos descartados', () => {
     await home.tips.restore()
     expect(await home.tips.dismissed()).toEqual([])
   })
+})
+
+test('una copia antigua conserva las tareas sin hora ni repetición', async () => {
+  const other = fresh()
+  await other.backup.restore(null, await broken((d) => {
+    d.version = 1
+    const task = d.records.find((r) => r.typeId === 'task')
+    if (task) task.data = { title: 'Regar', dueDate: '2026-11-25', done: false }
+  }))
+  const task = (await other.records.list(home.andres, { typeId: 'task' }))[0]
+  expect(task?.data).toEqual({ title: 'Regar', dueDate: '2026-11-25', done: false, members: [] })
 })

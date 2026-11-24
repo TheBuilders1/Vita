@@ -15,7 +15,7 @@ const finances = defineModule({
   access: { member: 'read', vulnerable: 'none' },
   recordTypes: [
     defineRecordType({
-      id: 'transaction', name: 'Movimiento', plural: 'Movimientos', titleField: 'concept',
+      id: 'transaction', name: 'Gasto o ingreso', plural: 'Gastos e ingresos', titleField: 'concept',
       fields: {
         kind: { kind: 'select', label: 'Tipo', required: true, options: options({ expense: 'Gasto', income: 'Ingreso' }) },
         concept: { kind: 'text', label: 'Concepto', required: true },
@@ -29,10 +29,11 @@ const finances = defineModule({
       rules: [positive('amount'), notBefore('date', 'until', 'La repetición no puede acabar antes de empezar')],
     }),
     defineRecordType({
-      id: 'budget', name: 'Presupuesto', plural: 'Presupuestos', titleField: 'category',
+      id: 'budget', name: 'Tope de gasto', plural: 'Topes de gasto', titleField: 'category',
+      uniqueBy: 'category',
       fields: {
         category: { kind: 'select', label: 'Categoría', required: true, options: EXPENSE_CATEGORIES },
-        limit: { kind: 'money', label: 'Límite mensual', required: true },
+        limit: { kind: 'money', label: 'Tope al mes', required: true },
       },
       rules: [positive('limit')],
     }),
@@ -45,7 +46,7 @@ const savings = defineModule({
   access: { member: 'read', vulnerable: 'none' },
   recordTypes: [
     defineRecordType({
-      id: 'savingsGoal', name: 'Objetivo', plural: 'Objetivos', titleField: 'name',
+      id: 'savingsGoal', name: 'Objetivo de ahorro', plural: 'Objetivos de ahorro', titleField: 'name',
       fields: {
         name: { kind: 'text', label: 'Objetivo', required: true },
         target: { kind: 'money', label: 'Cantidad que queremos reunir', required: true },
@@ -87,7 +88,7 @@ const kidsMoney = defineModule({
       agenda: [{ dateField: 'startDate', repeatField: 'repeat', untilField: 'endDate', category: 'reminder' }],
     }),
     defineRecordType({
-      id: 'kidMovement', name: 'Movimiento', plural: 'Movimientos', titleField: 'concept', visibility: RESTRICTED, selfLog: true,
+      id: 'kidMovement', name: 'Gasto o ingreso', plural: 'Gastos e ingresos', titleField: 'concept', visibility: RESTRICTED, selfLog: true,
       fields: {
         member: { kind: 'member', label: 'Hijo o hija', required: true },
         concept: { kind: 'text', label: 'Concepto', required: true },

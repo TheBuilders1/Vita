@@ -106,7 +106,7 @@ const care = defineModule({
   description: 'Rutinas de cuidado, ayudas técnicas e información para cuidadores.',
   recordTypes: [
     defineRecordType({
-      id: 'careNeed', name: 'Necesidad', plural: 'Necesidades', titleField: 'title', visibility: RESTRICTED,
+      id: 'careNeed', name: 'Necesidad de cuidado', plural: 'Necesidades de cuidado', titleField: 'title', visibility: RESTRICTED,
       fields: {
         member: { kind: 'member', label: 'Persona', required: true },
         title: { kind: 'text', label: 'Necesidad', required: true },

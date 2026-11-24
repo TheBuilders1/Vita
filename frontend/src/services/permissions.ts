@@ -43,6 +43,10 @@ export function canUpdate(actor: Member, record: FamilyRecord): boolean {
 
 export const canDelete = canUpdate
 
+/** Lo que otra persona tenía colgado de lo borrado se puede recuperar, pero no destruir. */
+export const canErase = (actor: Member, entry: { readonly record: FamilyRecord; readonly dependents: readonly FamilyRecord[] }) =>
+  [entry.record, ...entry.dependents].every((r) => canDelete(actor, r))
+
 export function canComplete(actor: Member, record: FamilyRecord): boolean {
   if (!getRecordType(record.typeId).doneField || !canRead(actor, record)) return false
   return canUpdate(actor, record) || record.subjectIds.length === 0 || record.subjectIds.includes(actor.id)

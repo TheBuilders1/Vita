@@ -1,5 +1,6 @@
 import { Building2, CalendarDays, House, Settings, Users } from 'lucide-react'
 import { Navigate, Outlet, useLocation } from 'react-router'
+import { LogoMark } from '@/components/layout/Logo'
 import { TopBar } from '@/components/layout/TopBar'
 import type { NavItem } from '@/components/navigation/MainNav'
 import { DemoBanner } from '@/features/dashboard/DemoBanner'
@@ -9,20 +10,26 @@ import { Backdrop } from '@/components/backdrop/Backdrop'
 import { RecordEditorProvider } from '@/features/records/RecordEditorProvider'
 import { HomeContext, useHomeQuery } from './providers/home'
 
+/** En el centro y destacada, en todos los perfiles. */
+const VITA: NavItem = { to: '/vita', label: 'Vita', icon: LogoMark, main: true }
+
 const NAV: readonly NavItem[] = [
   { to: '/', label: 'Edificio', icon: Building2 },
   { to: '/calendario', label: 'Calendario', icon: CalendarDays },
+  VITA,
   { to: '/hogar', label: 'Mi hogar', icon: Users },
   { to: '/ajustes', label: 'Ajustes', icon: Settings },
 ]
-/** Menos opciones para el perfil vulnerable; los ajustes siguen al pie de su portada. */
+/** Los mismos cinco sitios que los demás perfiles, con las palabras de su portada. */
 const SIMPLE_NAV: readonly NavItem[] = [
   { to: '/', label: 'Inicio', icon: House },
   { to: '/calendario', label: 'Calendario', icon: CalendarDays },
+  VITA,
   { to: '/edificio', label: 'Mi casa', icon: Building2 },
+  { to: '/ajustes', label: 'Ajustes', icon: Settings },
 ]
 
-/** Todo lo que necesita una familia creada. */
+/** Todo lo que necesita un hogar creado. */
 export function AppLayout() {
   const home = useHomeQuery()
   const { pathname } = useLocation()

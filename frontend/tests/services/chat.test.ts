@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { MODULES } from '@/modules/registry'
-import { answer, type ChatContext, type Reply } from '@/services/chat'
+import { answer, reviewReply, type ChatContext, type Reply } from '@/services/chat'
 import { buildMember, buildRecord } from '../support/builders'
 
 const today = '2026-11-24' // martes
@@ -46,6 +46,13 @@ describe('apuntar', () => {
     expect(all.map((p) => p.data)).toMatchObject([{ list: 'list', name: 'Leche', quantity: 2, unit: 'litros' }, { list: 'list', name: 'Pan' }, { list: 'list', name: 'Huevos', quantity: 12 }])
     expect(all.every((p) => p.typeId === 'shoppingItem' && p.ready)).toBe(true)
   })
+  test.each(['compra 1,5 kg de arroz', 'compra 1,5 kg de arroz, 2 barras de pan y leche'])('conserva la coma decimal en «%s»', (message) => {
+    const all = proposals(ask(message))
+    const rice = { name: 'Arroz', quantity: 1.5, unit: 'kg' }
+    expect(all.map((p) => p.data)).toMatchObject(message.includes('pan')
+      ? [rice, { name: 'Pan', quantity: 2, unit: 'barras' }, { name: 'Leche' }]
+      : [rice])
+  })
   test('«comprar» también vale', () => expect(only(ask('comprar aceite de oliva'))).toMatchObject({ typeId: 'shoppingItem', data: { name: 'Aceite de oliva' } }))
   test('con varias listas no elige por su cuenta', () => {
     const other = buildRecord({ id: 'other', typeId: 'shoppingList', moduleId: 'shopping', data: { name: 'Ferretería' } })
@@ -76,6 +83,72 @@ describe('apuntar', () => {
     expect(proposals(ask('recuérdame regar las plantas', { actor: pilar }))).toHaveLength(1)
   })
   test('una habitación cerrada se dice', () => expect(ask('compra leche', { enabled: ['planner'] })).toMatchObject({ kind: 'text', text: expect.stringContaining('cerrada') }))
+})
+
+describe('respuestas guardadas', () => {
+  const document = buildRecord({ id: 'doc', typeId: 'document', moduleId: 'documents', ownerId: ana.id,
+    data: { title: 'Documento de prueba', expiryDate: '2027-01-01' } })
+  const before = context({ actor: leo, records: [document] })
+
+  test.each([
+    ['se borra', { records: [] }],
+    ['se vuelve privada', { records: [{ ...document, visibility: 'private' as const }] }],
+    ['se cierra su habitación', { enabled: ['planner'] as const }],
+  ] satisfies [string, Partial<ChatContext>][])('oculta una ficha guardada cuando %s', (_, change) => {
+    const reply = answer('¿Cuándo caduca el documento?', before)
+    expect(reply.kind).toBe('facts')
+    expect(reviewReply(reply, { ...before, ...change })).toEqual({ kind: 'text', text: 'Esto ya no está disponible para tu perfil' })
+  })
+
+  test('conserva la ficha que aún se ve y sustituye la borrada', () => {
+    const other = { ...document, id: 'otra', data: { title: 'Otra ficha', expiryDate: '2028-01-02' } }
+    const reply = answer('¿Cuándo caducan los documentos?', { ...before, records: [document, other] })
+    expect(reviewReply(reply, { ...before, records: [other] })).toMatchObject({
+      kind: 'facts', facts: [{ key: 'doc', unavailable: true }, { key: 'otra', title: 'Otra ficha' }],
+    })
+  })
+
+  test('oculta el nombre de una lista borrada que aparecía en un artículo', () => {
+    const shoppingItem = buildRecord({ id: 'item', typeId: 'shoppingItem', moduleId: 'shopping', data: { list: list.id, name: 'Arroz' } })
+    const reply = ask('¿Qué falta en la compra?', { records: [shoppingItem, list] })
+    expect(reply).toMatchObject({ kind: 'facts', facts: [{ text: 'Compra de casa' }] })
+    expect(reviewReply(reply, context({ records: [shoppingItem] }))).toEqual({ kind: 'text', text: 'Esto ya no está disponible para tu perfil' })
+  })
+
+  test('oculta un contacto retirado y conserva el botón general de emergencias', () => {
+    const contact = buildRecord({ id: 'c', typeId: 'emergencyContact', moduleId: 'emergency', data: { name: 'Contacto de prueba', phone: '000 000 000' } })
+    const reply = ask('es una emergencia', { records: [contact] })
+    expect(reviewReply(reply, context({ records: [] }))).toMatchObject({
+      kind: 'emergency', number: '112', contacts: [{ recordId: 'c', unavailable: true }],
+    })
+  })
+
+  test('oculta fechas y lugares de una cita retirada', () => {
+    const appointment = buildRecord({ id: 'cita', typeId: 'event', moduleId: 'planner', data: { title: 'Cita de prueba', date: today, place: 'Lugar de prueba' } })
+    const reply = ask('¿Qué tengo hoy?', { records: [appointment] })
+    expect(reply).toMatchObject({ kind: 'agenda', items: [{ detail: 'Lugar de prueba' }] })
+    expect(reviewReply(reply, context({ records: [] }))).toEqual({ kind: 'text', text: 'Esto ya no está disponible para tu perfil' })
+  })
+
+  test('el gasto guardado deja de verse si se retira un apunte que se sumó', () => {
+    const transaction = buildRecord({ id: 'gasto', typeId: 'transaction', moduleId: 'finances', data: { kind: 'expense', category: 'food', date: today, amount: 8000 } })
+    const reply = ask('¿Cuánto llevamos en comida?', { records: [transaction] })
+    expect(reply.kind).toBe('facts')
+    expect(reviewReply(reply, context({ records: [] }))).toEqual({ kind: 'text', text: 'Esto ya no está disponible para tu perfil' })
+  })
+
+  test('una propuesta guardada y borrada deja de mostrar lo que contenía', () => {
+    const reply = ask('apunta tarea revisar el contador')
+    expect(reply.kind).toBe('proposals')
+    expect(reviewReply(reply, context(), { 0: { state: 'saved', recordId: 'borrada' } })).toEqual({ kind: 'text', text: 'Esto ya no está disponible para tu perfil' })
+  })
+
+  test('una tarea ya marcada deja de mostrar el aviso de guardado cuando se borra', () => {
+    const task = buildRecord({ id: 'tarea', data: { title: 'Revisar el contador', done: false } })
+    const reply = ask('he hecho revisar el contador', { records: [task] })
+    expect(reply.kind).toBe('complete')
+    expect(reviewReply(reply, context(), { 0: { state: 'saved', recordId: task.id } })).toEqual({ kind: 'text', text: 'Esto ya no está disponible para tu perfil' })
+  })
 })
 
 describe('lo que no hace', () => {
@@ -138,3 +211,60 @@ describe('documentos y personas como fuente', () => {
 })
 
 test.each(['hola', 'ayuda', '¿qué puedes hacer?'])('%s explica qué sabe hacer y que no es IA', (text) => expect(ask(text)).toMatchObject({ kind: 'text', text: expect.stringContaining('frases sencillas') }))
+
+describe('acciones y consultas nuevas', () => {
+  test.each([
+    ['recuérdame regar las plantas cada lunes a las 9', { title: 'Regar las plantas', dueDate: '2026-11-30', time: '09:00', repeat: 'weekly' }],
+    ['cada mes pagar el alquiler el día 5', { title: 'Pagar el alquiler', dueDate: '2026-12-05', repeat: 'monthly' }],
+    ['todos los días sacar al perro', { title: 'Sacar al perro', dueDate: today, repeat: 'daily' }],
+  ])('propone una tarea con la repetición de %s', (text, data) => {
+    expect(only(ask(text))).toMatchObject({ typeId: 'task', ready: true, data })
+  })
+
+  const task = (id: string, data = {}) => buildRecord({ id, typeId: 'task', moduleId: 'planner', data: { title: 'Regar las plantas', ...data } })
+
+  test('ofrece elegir entre tareas con el mismo nombre', () => {
+    expect(ask('marca regar las plantas como hecha', { records: [task('a'), task('b')] }))
+      .toMatchObject({ kind: 'complete', choices: [{ recordId: 'a' }, { recordId: 'b' }] })
+  })
+
+  test('solo propone la coincidencia que sigue pendiente', () => {
+    expect(ask('completa regar las plantas', { records: [task('a'), task('b', { done: true })] }))
+      .toMatchObject({ kind: 'complete', choices: [{ recordId: 'a' }] })
+  })
+
+  test('busca documentos visibles y omite habitaciones cerradas', () => {
+    const records = [buildRecord({ id: 'doc', typeId: 'document', moduleId: 'documents', ownerId: ana.id, data: { title: 'DNI', kind: 'id' } })]
+    expect(ask('busca el DNI', { records })).toMatchObject({ kind: 'facts', facts: [{ recordId: 'doc' }, { to: '/planta/finance/documents' }] })
+    expect(ask('busca el DNI', { records, enabled: ['planner'] }).kind).toBe('text')
+  })
+
+  test('muestra gasto y tope sin revelar Finanzas a perfiles sin acceso', () => {
+    const records = [
+      buildRecord({ typeId: 'transaction', moduleId: 'finances', data: { kind: 'expense', concept: 'Compra', category: 'food', date: today, amount: 8000 } }),
+      buildRecord({ typeId: 'budget', moduleId: 'finances', data: { category: 'food', limit: 10000 } }),
+    ]
+    expect(ask('¿cuánto llevamos en comida?', { records })).toMatchObject({ kind: 'facts', facts: [{ key: 'food', text: expect.stringMatching(/80.*100/) }] })
+    expect(ask('¿cuánto llevamos en comida?', { records, actor: pilar }).kind).toBe('text')
+  })
+
+  test('enlaza ayuda para borrar', () => expect(ask('¿cómo borro algo?')).toMatchObject({ kind: 'text', link: { to: '/ayuda#borrar' } }))
+})
+
+test.each(['cada lunes y martes regar las plantas', 'cada mes pagar el alquiler el día 5 y 10', 'cada día regar las plantas a las 9 y a las 18'])('pide aclaración para %s', (text) => {
+  expect(ask(text).kind).toBe('text')
+})
+
+test('pregunta cuándo empieza una tarea mensual sin día y no ofrece guardarla', () => {
+  expect(only(ask('cada mes regar las plantas'))).toMatchObject({ ready: false, missing: ['Para cuándo'] })
+})
+
+test('no propone completar una tarea cuyos permisos corresponden a otra persona', () => {
+  const task = buildRecord({ typeId: 'task', moduleId: 'planner', ownerId: ana.id, subjectIds: [leo.id], data: { title: 'Regar las plantas', members: [leo.id] } })
+  expect(ask('marca regar las plantas como hecha', { records: [task], actor: pilar }).kind).toBe('text')
+})
+
+test('la búsqueda no revela una ficha privada de otro perfil', () => {
+  const record = buildRecord({ typeId: 'document', moduleId: 'documents', ownerId: leo.id, visibility: 'private', data: { title: 'DNI oculto de prueba', kind: 'id' } })
+  expect(ask('busca oculto de prueba', { records: [record] }).kind).toBe('text')
+})

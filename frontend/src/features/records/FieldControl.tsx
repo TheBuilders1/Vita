@@ -6,6 +6,7 @@ import { ChoicesInput, IngredientsInput, NumberInput, TagsInput, TimesInput, Wee
 import { MoneyInput } from '@/components/form/MoneyInput'
 import { Checkbox, SelectInput, TextArea, TextInput } from '@/components/ui/Field'
 import type { Field, Ingredient } from '@/modules/fields'
+import { isOfAnother } from '@/services/integrity'
 import { recordTitle, titleContext } from '@/services/titles'
 import type { Member } from '@/types/family'
 
@@ -16,14 +17,17 @@ interface FieldControlProps {
   /** Personas que se pueden elegir. */
   people: readonly Member[]
   inputRef: RefCallBack
+  /** Persona ya elegida en el formulario: solo se ofrece lo suyo. */
+  member: unknown
   onChange: (value: unknown) => void
   onBusy: (busy: boolean) => void
+  locked: boolean
 }
 
 const list = <T,>(value: unknown) => (value ?? []) as T[]
 
 /** Un control por tipo de campo: es todo lo que necesita un módulo nuevo para tener formulario. */
-export function FieldControl({ field, value, error, people, inputRef, onChange, onBusy }: FieldControlProps) {
+export function FieldControl({ field, value, error, people, inputRef, member, onChange, onBusy, locked }: FieldControlProps) {
   const { records, members } = useHome()
   const info = { label: field.label, help: field.help, error, required: field.required ?? false }
   const text = { ...info, ref: inputRef, value: String(value ?? ''), onChange: (e: { target: { value: string } }) => onChange(e.target.value) }
@@ -43,7 +47,7 @@ export function FieldControl({ field, value, error, people, inputRef, onChange, 
     case 'member': return <SelectInput {...text} options={person} empty={field.required ? 'Elige una persona' : 'Nadie en concreto'} />
     case 'record': {
       const context = titleContext(members, records)
-      const options = records.filter((r) => r.typeId === field.refType).map((r) => ({ value: r.id, label: recordTitle(r, context) }))
+      const options = records.filter((r) => r.typeId === field.refType && !isOfAnother({ member: member === '' ? undefined : member }, r)).map((r) => ({ value: r.id, label: recordTitle(r, context) }))
       return <SelectInput {...text} options={options} empty={options.length === 0 ? 'Todavía no hay ninguno' : field.required ? 'Elige una opción' : 'Sin indicar'} />
     }
     case 'boolean': return <Checkbox label={field.label} {...(field.help && { help: field.help })} checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />
@@ -53,7 +57,7 @@ export function FieldControl({ field, value, error, people, inputRef, onChange, 
     case 'tags': return <TagsInput {...info} value={list<string>(value)} onChange={onChange} />
     case 'times': return <TimesInput {...info} value={list<string>(value)} onChange={onChange} />
     case 'ingredients': return <IngredientsInput {...info} value={list<Ingredient>(value)} onChange={onChange} />
-    case 'files': return <FilesInput {...info} value={list<string>(value)} onChange={onChange} onBusy={onBusy} />
+    case 'files': return <FilesInput {...info} value={list<string>(value)} onChange={onChange} onBusy={onBusy} locked={locked} />
     case 'links': return <LinksInput {...info} value={list<string>(value)} onChange={onChange} />
   }
 }

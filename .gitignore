@@ -22,3 +22,7 @@ openclaw/vita-tools/package-lock.json
 # Con ancla: sin ella ignoraría también frontend/src/data.
 /data/
 vita-demo-document.png
+
+# Notas y caché locales de cada persona
+/reporte.md
+.vite/

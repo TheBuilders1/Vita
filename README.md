@@ -10,7 +10,7 @@ El frontend funciona sin la API. De forma opcional la usa para leer la caducidad
 Gestión del hogar en un espacio privado, alrededor de un edificio isométrico de cinco plantas.
 Los datos se guardan en el navegador (IndexedDB). Solo salen las fotos de documentos que se manden leer, si se activa esa opción.
 
-> Los datos **no están cifrados**. Se pierden si se borra el almacenamiento del navegador, y los roles
+> Los datos **no están cifrados** en el navegador (la copia de seguridad sí puede llevar contraseña). Se pierden si se borra el almacenamiento del navegador, y los roles
 > simulan permisos dentro de la app: no protegen frente a quien use este dispositivo.
 
 Está en [`frontend/`](frontend/README.md), con su documentación en `frontend/docs/`.

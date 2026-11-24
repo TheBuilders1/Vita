@@ -1,8 +1,8 @@
 import { createStore } from 'zustand/vanilla'
-import type { Reply } from '@/services/chat'
+import type { CardStatus, Reply } from '@/services/chat'
 import { newId } from '@/utils/ids'
 
-export type CardStatus = { readonly state: 'editing' } | { readonly state: 'saved'; readonly recordId: string } | { readonly state: 'undone' }
+export type { CardStatus }
 export interface Turn { readonly id: string; readonly message: string; readonly reply: Reply; readonly cards: Readonly<Record<number, CardStatus>> }
 
 /** La conversación vive en memoria y es de un solo perfil: al cambiar de perfil o recargar, desaparece. */

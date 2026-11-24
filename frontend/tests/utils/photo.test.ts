@@ -1,5 +1,17 @@
 import { expect, test } from 'vitest'
-import { carriesMetadata, fitWithin, jpgName, needsReduction } from '@/utils/photo'
+import { ValidationError } from '@/services/errors'
+import { carriesMetadata, fitWithin, jpgName, needsReduction, prepareMemberPhoto, squareCrop } from '@/utils/photo'
+
+test.each([[4000, 3000, 500, 0, 3000], [100, 201, 0, 50.5, 100], [256, 256, 0, 0, 256]])(
+  'centra el recorte cuadrado de %d×%d', (width, height, x, y, side) => {
+    expect(squareCrop(width, height)).toEqual({ x, y, side })
+  },
+)
+
+test('rechaza un archivo que no es una imagen de perfil', async () => {
+  const file = new File(['%PDF-1.7'], 'prueba.pdf', { type: 'application/pdf' })
+  await expect(prepareMemberPhoto(file)).rejects.toBeInstanceOf(ValidationError)
+})
 
 test.each([[4000, 3000, 2400, 1800], [3000, 4000, 1800, 2400], [2400, 100, 2400, 100], [800, 600, 800, 600], [10000, 1, 2400, 1]])('%d×%d cabe en 2400', (w, h, width, height) => expect(fitWithin(w, h)).toEqual({ width, height }))
 

@@ -5,7 +5,7 @@ import { subjectsOf } from '@/services/integrity'
 import type { FamilyRecord } from '@/types/records'
 import { ambiguousNames, mentioned, withoutPerson } from './people'
 import type { ChatContext, Proposal, Reply } from './types'
-import { findDate, findTime, plain, without, type Phrase } from './when'
+import { findDate, findRepeat, findTime, plain, without, type Phrase } from './when'
 
 const DENTAL = /\b(dentista|dental|ortodon\w*|muela|empaste|caries|limpieza bucal)/
 const MEDICAL = /\b(medic[oa]s?|pediatra|doctora?|hospital|ambulatorio|analisis|analitica|vacuna\w*|cita medica|consulta|matrona|oculista|oftalmolog\w*|fisio\w*|dermatolog\w*|ginecolog\w*|cardiolog\w*|psicolog\w*|enfermer\w*|revision medica)/
@@ -64,7 +64,7 @@ function shopping(text: Phrase, context: ChatContext): Reply {
   const list: FamilyRecord | undefined = named.length === 1 ? named[0] : lists.length === 1 ? lists[0] : undefined
   let rest = without(without(text, SHOPPING_LIST), BUY)
   if (named.length === 1) rest = without(rest, new RegExp(`(?:\\b(?:a|en|para) )?(?:la )?(?:lista )?(?:de )?${plain(String(named[0]!.data.name)).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))
-  const items = rest.raw.split(/\s*,\s*|\s+y\s+/).map((t) => item(t.replace(/[.;:!?¿¡]+$/, ''))).filter((i) => i !== undefined).slice(0, MAX_ITEMS)
+  const items = rest.raw.split(/\s*(?:(?<!\d),|,(?!\d))\s*|\s+y\s+/).map((t) => item(t.replace(/[.;:!?¿¡]+$/, ''))).filter((i) => i !== undefined).slice(0, MAX_ITEMS)
   if (items.length === 0) return { kind: 'text', text: '¿Qué hay que comprar? Por ejemplo: «compra leche y pan».' }
   const proposals = items.map((data) => build('shoppingItem', { ...(list && { list: list.id }), ...data }, []))
   return { kind: 'proposals', text: proposals.length === 1 ? 'Voy a añadir esto a la compra:' : `Voy a añadir estas ${proposals.length} cosas a la compra:`, proposals }
@@ -72,7 +72,40 @@ function shopping(text: Phrase, context: ChatContext): Reply {
 
 const DENTAL_KIND: readonly (readonly [RegExp, string])[] = [[/limpieza/, 'cleaning'], [/ortodon/, 'orthodontics'], [/empaste|caries|muela/, 'treatment']]
 
+function repeatingTask(schedule: NonNullable<ReturnType<typeof findRepeat>>, context: ChatContext): Reply {
+  const { repeat, text } = schedule
+  const clock = findTime(text)
+  const when = findDate(clock.text, context.today)
+  const others = mentioned(when.text.plain, context.members)
+  const ambiguous = ambiguousNames(others)
+  let rest = without(when.text, /^tarea\b:?/)
+  for (const person of others) rest = withoutPerson(rest, person, 'para')
+  const name = title(without(rest, /\bpara mi\b/))
+  const extra = findDate(rest, context.today)
+  const multipleDays = repeat === 'monthly' && /\bdia \d{1,2}(?:,| y| o) ?\d{1,2}\b/.test(text.plain)
+  if (multipleDays || findRepeat(rest) || extra.value || extra.problem || findTime(rest).value || /\b(?:hasta|entre semana|quincena|y (?:los )?(?:lunes|martes|miercoles|jueves|viernes|sabado|domingo))\b/.test(rest.plain)) {
+    return { kind: 'text', text: '¿Qué día y a qué hora se repite? Dime una sola pauta, por ejemplo «cada lunes a las 9».' }
+  }
+  if (!name) return { kind: 'text', text: '¿Qué tarea quieres que se repita?' }
+  const dueDate = when.value ?? (repeat === 'daily' && !when.problem ? context.today : undefined)
+  const notes = [
+    when.problem, clock.problem ? (clock.value ? '¿La hora es de la mañana o de la tarde? Revísala en el formulario.' : clock.problem) : undefined, ...ambiguous.map((person) => `Hay más de una persona que se llama ${person}: elige cuál.`),
+    dueDate === undefined && !when.problem ? '¿Qué día quieres que empiece?' : undefined,
+  ].filter((note) => note !== undefined)
+  const data: RecordData = {
+    title: name, members: others.filter((person) => !ambiguous.includes(person.name)).map((person) => person.id),
+    repeat, dueDate, ...(clock.value && !clock.problem && { time: clock.value }),
+  }
+  const refused = refusal(context, 'task', data)
+  return refused ?? { kind: 'proposals', text: 'Revisa esta tarea que se repite.', proposals: [build('task', data, notes, notes.length > 0)] }
+}
+
 export function propose(text: Phrase, context: ChatContext, selfish: boolean): Reply {
+  const schedule = findRepeat(text)
+  if (schedule) return repeatingTask(schedule, context)
+  if (/\b(?:cada|todos los|todas las) (?:dos|tres|\d+|semanas|meses|años)\b/.test(text.plain)) {
+    return { kind: 'text', text: '¿Cómo se repite? Prueba con «cada día», «cada lunes» o «cada mes el día 5».' }
+  }
   const when = findDate(text, context.today)
   const clock = findTime(when.text)
   const dated = when.value !== undefined || when.problem !== undefined || clock.value !== undefined
@@ -106,9 +139,7 @@ export function propose(text: Phrase, context: ChatContext, selfish: boolean): R
   const name = title(without(rest, /\bpara mi\b/))
   if (!name) return { kind: 'text', text: '¿Qué quieres que apunte? Por ejemplo: «apunta dentista para el martes a las 10».' }
   const typeId = event ? 'event' : 'task'
-  // Una tarea no guarda la hora: se dice en vez de perderla.
-  const extra = !event && time !== undefined ? [`Las tareas no llevan hora: no guardaré las ${time}.`] : []
-  const data: RecordData = { title: name, members: people.map((m) => m.id), ...(event ? { ...(date && { date }), ...(time && { time }) } : date && { dueDate: date }) }
+  const data: RecordData = { title: name, members: people.map((m) => m.id), ...(event ? date && { date } : date && { dueDate: date }), ...(time && { time }) }
   const refused = refusal(context, typeId, data)
-  return refused ?? { kind: 'proposals', text: 'Voy a apuntar esto:', proposals: [build(typeId, data, [...notes, ...extra], blocked)] }
+  return refused ?? { kind: 'proposals', text: 'Voy a apuntar esto:', proposals: [build(typeId, data, notes, blocked)] }
 }

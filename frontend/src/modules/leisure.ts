@@ -30,7 +30,7 @@ const shopping = defineModule({
   access: { member: 'write', vulnerable: 'write' },
   recordTypes: [
     defineRecordType({
-      id: 'shoppingList', name: 'Lista', plural: 'Listas', titleField: 'name',
+      id: 'shoppingList', name: 'Lista de compra', plural: 'Listas de compra', titleField: 'name',
       fields: {
         name: { kind: 'text', label: 'Nombre de la lista', required: true },
         budget: { kind: 'money', label: 'Presupuesto' },

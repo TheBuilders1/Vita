@@ -39,15 +39,15 @@ Ya cumplía: idioma, un `h1` por pantalla, zonas, enlace «Saltar al contenido»
 | Heurística | Valoración | Gravedad pendiente |
 |---|---|---|
 | 1. Visibilidad del estado | Avisos al guardar, «Paso 1 de 2», pendientes por habitación, pantalla actual marcada | 0 |
-| 2. Lenguaje del mundo real | Palabras de casa, sin jerga; fechas como «Ayer» | 0. «Máster del hogar» puede sonar técnico (1) |
-| 3. Control y libertad | «Atrás» **perdía lo escrito sin avisar** (4): corregido. «Hecho» se deshace | Borrar pide confirmación, pero no se deshace (2) |
+| 2. Lenguaje del mundo real | Palabras de casa, sin jerga; fechas como «Ayer» | 0. «Máster» pasó a llamarse «Admin del hogar» |
+| 3. Control y libertad | «Atrás» **perdía lo escrito sin avisar** (4): corregido. «Hecho» se deshace | 0. Borrar se deshace al momento y, durante 30 días, desde la papelera de Ajustes |
 | 4. Consistencia | Mismos botones, diálogos y verbos en todas las habitaciones | 0 |
 | 5. Prevención de errores | Aviso al recargar con cambios: añadido. Confirmaciones que dicen qué pasará | 0 |
 | 6. Reconocer antes que recordar | Iconos siempre con texto; edificio y lista de plantas a la vez | 0 |
-| 7. Flexibilidad y eficiencia | «Apuntar» desde la portada; perfil simple | No hay búsqueda global (2) |
-| 8. Diseño minimalista | Portada por prioridad | En móvil, cuatro filas de controles antes del mes en el calendario (2) |
+| 7. Flexibilidad y eficiencia | «Apuntar» desde la portada; perfil simple | 0. Búsqueda global sin tildes en `/buscar` |
+| 8. Diseño minimalista | Portada por prioridad | 0. Controles del calendario compactados en móvil; falta verlo en un móvil |
 | 9. Recuperarse de errores | Mensajes concretos junto al campo; si falla una pantalla, el menú sigue | 0 |
-| 10. Ayuda | Textos de ayuda en los campos y guías por módulo | No hay una ayuda general (2) |
+| 10. Ayuda | Textos de ayuda en los campos y guías por módulo | 0. Ayuda general en `/ayuda` |
 
 Asistente de alta: dos pasos imprescindibles y los demás opcionales. El paso va en la dirección: recargar, «atrás» y salir y volver conservan el paso y lo escrito mientras no se cierre la pestaña. Corregido.
 
@@ -74,7 +74,7 @@ La fuente original (uxmyths.com) rechaza lecturas automáticas. Los títulos 1 a
 | 13 | Los iconos mejoran la usabilidad | ✔ | ✔ | Ninguno va sin texto |
 | 14 | Eres como tus usuarios | ✘ | ✘ | No se ha probado con nadie de 40+ |
 | 15 | Los usuarios eligen lo óptimo | ✔ | ✔ | Opciones a la vista y valores por defecto |
-| 16 | La búsqueda arregla la navegación | ✔ | ✔ | Se navega sin buscador; faltaría como complemento |
+| 16 | La búsqueda arregla la navegación | ✔ | ✔ | Se navega sin buscador; el buscador es un complemento |
 | 17 | La portada es lo más importante | ✔ | ✔ | Cada habitación tiene su dirección |
 | 18 | Flash es malo | — | — | |
 | 19 | No hace falta contenido para diseñar | ✔ | ✔ | Diseñada con un hogar de ejemplo completo |
@@ -89,7 +89,7 @@ La fuente original (uxmyths.com) rechaza lecturas automáticas. Los títulos 1 a
 | 28 | El espacio en blanco es espacio perdido | ✔ | ◐ | En móvil, los controles del calendario van apretados |
 | 29 | La gente es racional | ✔ | ✔ | Confirmaciones, deshacer y tono tranquilo |
 | 30 | Si eres experto, no hace falta probar | ✘ | ✘ | Esta revisión es experta: falta probar |
-| 31 | UX es una fase del proyecto | ◐ | ◐ | Hay tests de contraste; falta axe en la CI |
+| 31 | UX es una fase del proyecto | ◐ | ◐ | Hay tests de contraste y axe en la CI |
 | 32 | El éxito llega de golpe | — | — | |
 | 33 | *Los usuarios móviles están distraídos* | — | ✔ | Misma funcionalidad que en escritorio |
 | 34 | *Simple = minimalista* | ✔ | ✔ | Perfil simple: menos opciones, no menos ayuda |
@@ -113,7 +113,5 @@ Al acabar, cuestionario SUS; objetivo, 75 o más.
 
 1. Probar con NVDA o VoiceOver y con TalkBack, en móvil físico.
 2. Prueba con cinco personas.
-3. axe en la CI (añade una dependencia de desarrollo: pedir permiso).
-4. Deshacer un borrado.
-5. Compactar los controles del calendario en móvil.
-6. Búsqueda global y página de ayuda.
+3. Importar el `.ics` en Google Calendar, Apple y Outlook, e instalar Vita en un móvil.
+4. Probar la voz en un dispositivo con voces en español y el menú de compartir en un móvil.

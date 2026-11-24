@@ -1,6 +1,10 @@
 import type { RecordData } from '@/modules/fields'
 import type { ModuleId, Visibility } from '@/modules/types'
 
+export const CHANGE_KINDS = ['changed', 'done', 'pending', 'restored'] as const
+/** Quién cambió qué y cuándo. Crear no se apunta: ya están la fecha y quien lo añadió. */
+export interface ChangeEntry { by: string; at: string; kind: (typeof CHANGE_KINDS)[number]; fields: string[] }
+
 export interface FamilyRecord<D extends RecordData = RecordData> {
   id: string
   typeId: string
@@ -13,6 +17,7 @@ export interface FamilyRecord<D extends RecordData = RecordData> {
   data: D
   createdAt: string
   updatedAt: string
+  history?: ChangeEntry[]
 }
 
 export const MAX_FILE_BYTES = 15 * 1024 * 1024

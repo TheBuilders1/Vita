@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import { VitaDb } from '@/database/db'
 import { createRepositories } from '@/database/repositories'
 import { openTestHome, person } from '../support/database'
+import { memberPhoto } from '../support/memberPhoto'
 
 let home: Awaited<ReturnType<typeof openTestHome>>
 beforeEach(async () => { home = await openTestHome() })
@@ -26,7 +27,7 @@ describe('crear la familia', () => {
     const db = new VitaDb('vita-sin-master')
     const { family } = createRepositories(db)
     await expect(family.setup({ family: { name: 'A', enabledModules: [] }, members: [person('X', 'member')] }))
-      .rejects.toThrow('El hogar necesita al menos un máster')
+      .rejects.toThrow('El hogar necesita al menos un admin')
     expect(await family.get()).toBeUndefined()
     expect(await family.listMembers()).toEqual([])
   })
@@ -39,6 +40,18 @@ describe('crear la familia', () => {
 })
 
 describe('gestionar integrantes', () => {
+  test.each(['andres', 'marta'] as const)('el perfil %s puede guardar la foto de Andrés', async (editor) => {
+    await home.family.updateMember(home[editor], home.andres, { photo: memberPhoto })
+    expect((await home.db.members.get(home.andres))?.photo).toBe(memberPhoto)
+  })
+  test('cada persona puede quitar su foto', async () => {
+    await home.family.updateMember(home.andres, home.andres, { photo: memberPhoto })
+    await home.family.updateMember(home.andres, home.andres, { photo: undefined })
+    expect((await home.db.members.get(home.andres))?.photo).toBeUndefined()
+  })
+  test('solo el admin puede cambiar la foto de otra persona', async () => {
+    await expect(home.family.updateMember(home.andres, home.nora, { photo: memberPhoto })).rejects.toThrow('No tienes permiso')
+  })
   test('el máster añade y modifica', async () => {
     const leo = await home.family.addMember(home.marta, person('Leo', 'member'))
     home.clock.now = new Date('2026-11-25T09:00:00.000Z')
@@ -58,7 +71,7 @@ describe('gestionar integrantes', () => {
     await expect(home.family.updateMember(home.andres, home.nora, { name: 'X' })).rejects.toThrow('No tienes permiso')
   })
   test('siempre queda un máster', async () => {
-    await expect(home.family.updateMember(home.marta, home.marta, { role: 'member' })).rejects.toThrow('El hogar necesita al menos un máster')
+    await expect(home.family.updateMember(home.marta, home.marta, { role: 'member' })).rejects.toThrow('El hogar necesita al menos un admin')
     await home.family.updateMember(home.marta, home.andres, { role: 'master' })
     await home.family.updateMember(home.marta, home.marta, { role: 'member' })
     expect((await home.family.listMembers()).filter((m) => m.role === 'master').map((m) => m.id)).toEqual([home.andres])
