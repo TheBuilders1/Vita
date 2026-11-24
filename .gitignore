@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.py[cod]
+*.egg-info/
+openclaw/vita-tools/node_modules/
+openclaw/vita-tools/package-lock.json
+data/
+vita-demo-document.png

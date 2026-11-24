@@ -1,0 +1,17 @@
+{
+  "id": "vita-tools",
+  "name": "Vita tools",
+  "description": "Herramientas internas y acotadas para el backend Vita",
+  "categories": ["integrations"],
+  "contracts": {
+    "tools": ["vita_scan_document", "vita_report_result"]
+  },
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

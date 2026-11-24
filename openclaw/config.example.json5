@@ -1,0 +1,55 @@
+{
+  gateway: {
+    bind: "loopback",
+    auth: {
+      mode: "token",
+      token: "${OPENCLAW_TOKEN}",
+    },
+    http: {
+      endpoints: {
+        chatCompletions: { enabled: true },
+      },
+    },
+  },
+
+  plugins: {
+    allow: ["vita-tools"],
+    load: {
+      paths: ["/absolute/path/to/Vita/openclaw/vita-tools"],
+    },
+    entries: {
+      "vita-tools": { enabled: true },
+    },
+  },
+
+  agents: {
+    defaults: {
+      subagents: {
+        maxSpawnDepth: 1,
+        maxChildrenPerAgent: 1,
+        maxConcurrent: 1,
+        runTimeoutSeconds: 120,
+      },
+    },
+    entries: {
+      orquestador: {
+        workspace: "/absolute/path/to/Vita/openclaw/agents/orquestador",
+        tools: {
+          allow: ["sessions_spawn", "sessions_yield", "vita_report_result"],
+        },
+        subagents: {
+          allowAgents: ["documentos"],
+        },
+      },
+      documentos: {
+        workspace: "/absolute/path/to/Vita/openclaw/agents/documentos",
+        tools: {
+          allow: ["vita_scan_document"],
+        },
+        subagents: {
+          allowAgents: [],
+        },
+      },
+    },
+  },
+}
