@@ -1,5 +1,6 @@
 {
   gateway: {
+    mode: "local",
     bind: "loopback",
     auth: {
       mode: "token",
@@ -23,7 +24,9 @@
   },
 
   agents: {
+    ownership: "explicit",
     defaults: {
+      systemAgent: { agentId: "orquestador" },
       subagents: {
         maxSpawnDepth: 1,
         maxChildrenPerAgent: 1,

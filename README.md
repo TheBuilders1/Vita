@@ -85,10 +85,13 @@ Edita `.env` y reemplaza las contraseñas y tokens de ejemplo. Para las contrase
 
 Combina [`openclaw/config.example.json5`](openclaw/config.example.json5) con tu configuración existente; reemplaza `/absolute/path/to/Vita` por la ruta absoluta de este repositorio. **No sobrescribas tu `openclaw.json`.** El ejemplo configura el Gateway con bind loopback, autenticación por token, el plugin y dos agentes con permisos limitados.
 
-Instala y comprueba el plugin desde la raíz del repositorio:
+Instala la dependencia TypeBox del plugin (los plugins enlazados no resuelven automáticamente sus dependencias), y después instálalo y comprueba sus herramientas:
 
 ```bash
-openclaw plugins install --link "$PWD/openclaw/vita-tools"
+cd openclaw/vita-tools
+npm install --no-save --package-lock=false --legacy-peer-deps
+cd ../..
+openclaw plugins install --link "$PWD/openclaw/vita-tools" --accept-capabilities
 openclaw plugins enable vita-tools
 openclaw plugins inspect vita-tools --runtime --json
 ```
@@ -241,9 +244,11 @@ La respuesta incluye `reminderId` y `scheduledAt`. El aviso se calcula para las 
 
 ## Pruebas
 
-Instala el paquete y las dependencias de desarrollo en un entorno virtual con Python 3.10 o superior:
+Desde la raíz del repositorio, crea y activa un entorno virtual con Python 3.10 o superior. En Linux puede usarse `python3` para crear el entorno; los comandos siguientes usan el `python` del entorno ya activado:
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 python -m pip install -e '.[dev]'
 python -m pytest
 ```
