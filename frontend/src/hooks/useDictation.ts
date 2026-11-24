@@ -25,8 +25,8 @@ function recognitionClass(): RecognitionClass | undefined {
 
 export const canDictate = () => recognitionClass() !== undefined
 
-/** Si el navegador puede reconocer la voz en el propio dispositivo, nada sale de él. */
-export async function dictatesLocally(): Promise<boolean> {
+/** Si el navegador puede reconocer la voz en el propio dispositivo, nada sale de él. Solo se pregunta cuando la persona va a dictar. */
+async function dictatesLocally(): Promise<boolean> {
   try { return (await recognitionClass()?.available?.({ langs: [LANG], processLocally: true })) === 'available' } catch { return false }
 }
 
@@ -50,14 +50,16 @@ export function useDictation(onText: (text: string) => void) {
     setListening(true)
     recognition.lang = LANG
     recognition.interimResults = false
-    const local = await dictatesLocally()
-    // Pudo cerrarse la pantalla, o pararse, mientras se preguntaba.
-    if (current.current !== recognition) return
-    if (local) recognition.processLocally = true
-    else if (!remote) {
+    if (!remote) {
+      const local = await dictatesLocally()
+      // Pudo cerrarse la pantalla, o pararse, mientras se preguntaba.
+      if (current.current !== recognition) return
+      recognition.processLocally = local
+    }
+    if (!remote && !recognition.processLocally) {
       current.current = null
       setListening(false)
-      setProblem('Ahora este navegador no puede hacerlo sin enviar la voz fuera. Si te parece bien, permítelo en Ajustes.')
+      setProblem('Este navegador no puede dictar sin enviar la voz fuera. Si te parece bien, permítelo en Ajustes.')
       return
     }
     started.current = true

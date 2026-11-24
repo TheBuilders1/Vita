@@ -85,7 +85,7 @@ Catálogo vivo en `/sistema`. Tokens en `src/styles/tokens.css`; `tests/styles/c
 - **Copia con contraseña** (`services/cipher.ts`): PBKDF2-SHA-256 (600 000 vueltas) y AES-256-GCM con WebCrypto. La contraseña no se guarda. Sin HTTPS no hay WebCrypto y solo se ofrece sin cifrar.
 - **Versión de las copias:** 3 (fotos de perfil e historial). Las 1 y 2 se siguen restaurando.
 - **Sin conexión** (`server/offline.ts`, `app/offline.ts`): el service worker guarda solo el programa. La versión nueva espera a que la persona pulse «Actualizar». Al desarrollar se desinstala solo.
-- **Dictado** (`hooks/useDictation.ts`): apagado por defecto. Usa el reconocimiento del dispositivo si el navegador lo tiene; si no, avisa de que la voz sale.
+- **Dictado** (`hooks/useDictation.ts`): apagado por defecto. Se elige entre solo en el dispositivo o también con el servicio del navegador (con aviso). `SpeechRecognition.available()` tumba la pestaña en Chrome Headless Shell 159: nunca se llama al abrir una pantalla, solo al pulsar «Dictar».
 - **Voz** (`services/speech.ts`): solo voces `localService` en español.
 - **`uniqueBy`**: un registro por valor (un tope por categoría). Lo privado de otra persona no cuenta.
 - **Pruebas de navegador** (`e2e/`, `pnpm e2e`): versión compilada, 320 y 1440 px, con axe. Con `VITA_CHROMIUM=/ruta` se usa un navegador ya instalado.

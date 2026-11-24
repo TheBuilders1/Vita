@@ -118,3 +118,16 @@ test('se abre sin conexión', async ({ page, context }) => {
   await expect(page.getByRole('heading', { name: 'Ajustes', level: 1 })).toBeVisible()
   await context.setOffline(false)
 })
+
+test('el dictado está apagado, y activarlo avisa y enseña el botón', async ({ page }) => {
+  await page.goto('/vita')
+  await expect(page.getByRole('button', { name: 'Dictar' })).toHaveCount(0)
+  await page.goto('/ajustes')
+  await expect(page.getByRole('heading', { name: 'Ajustes', level: 1 })).toBeVisible()
+  const remote = page.getByRole('radio', { name: /También con el servicio/ })
+  test.skip(await remote.count() === 0, 'este navegador no sabe dictar')
+  await remote.check()
+  await expect(page.getByText('puede enviarla a la empresa')).toBeVisible()
+  await page.goto('/vita')
+  await expect(page.getByRole('button', { name: 'Dictar' })).toBeVisible()
+})
