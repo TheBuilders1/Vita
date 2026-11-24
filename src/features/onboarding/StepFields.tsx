@@ -15,7 +15,7 @@ export function StepFields({ step, ...props }: StepProps & { step: StepId }) {
   const { draft, errors, today, onChange } = props
   switch (step) {
     case 'name':
-      return <TextInput label="Nombre de la familia" required autoComplete="off" value={draft.name} error={errors.name} help="Por ejemplo: Los Robles." onChange={(e) => onChange({ name: e.target.value })} />
+      return <TextInput label="Nombre del hogar" required autoComplete="off" value={draft.name} error={errors.name} help="Por ejemplo: Los Robles." onChange={(e) => onChange({ name: e.target.value })} />
     case 'count':
       return <Count {...props} />
     case 'members':

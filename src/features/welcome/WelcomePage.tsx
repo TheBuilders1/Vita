@@ -1,8 +1,9 @@
-import { KeyRound, Lock, UsersRound } from 'lucide-react'
+import { Eye, Flame, Lock } from 'lucide-react'
 import { useState } from 'react'
 import { Navigate } from 'react-router'
 import { useHomeQuery } from '@/app/providers/home'
 import { Backdrop } from '@/components/backdrop/Backdrop'
+import { Logo } from '@/components/layout/Logo'
 import { RestoreButton } from '@/features/settings/RestoreButton'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { Notice } from '@/components/ui/Notice'
@@ -38,12 +39,12 @@ export function WelcomePage() {
     <Backdrop variant="full" quiet={0.42} />
     <main id="contenido" tabIndex={-1} className="mx-auto grid min-h-dvh max-w-[100rem] grid-cols-1 items-center gap-8 px-5 py-8 outline-none lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)] lg:px-10">
       <div>
-        <p className="font-pixel text-6xl leading-none sm:text-7xl">Vita</p>
-        <h1 className="mt-4 text-3xl font-bold sm:text-4xl">La casa donde cabe toda la organización de tu familia</h1>
-        <p className="mt-4 text-xl">Comidas, colegio, salud, cuentas y planes. Cada cosa en su habitación y todo a mano.</p>
+        <Logo className="h-16 max-w-full sm:h-24" />
+        <h1 className="mt-5 text-3xl font-bold sm:text-4xl">Tu hogar, al día</h1>
+        <p className="mt-4 text-xl">Comidas, colegio, salud, cuentas y planes. Cada cosa en su sitio y todo a mano.</p>
         <div className="mt-7 flex flex-wrap gap-3">
-          <ButtonLink to="/crear" variant="primary" size="lg" icon={KeyRound}>Crear mi familia</ButtonLink>
-          <Button size="lg" icon={UsersRound} disabled={busy} onClick={() => { void openDemo() }}>{busy ? 'Preparando…' : 'Ver una familia de ejemplo'}</Button>
+          <ButtonLink to="/crear" variant="primary" size="lg" icon={Flame}>Crear mi hogar</ButtonLink>
+          <Button size="lg" icon={Eye} disabled={busy} onClick={() => { void openDemo() }}>{busy ? 'Preparando…' : 'Ver un hogar de ejemplo'}</Button>
         </div>
         <div className="mt-3"><RestoreButton actorId={null} /></div>
         <div role="alert" className="mt-4">{error && <Notice tone="error">{error}</Notice>}</div>

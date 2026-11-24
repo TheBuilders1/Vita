@@ -70,9 +70,9 @@ export function Checkbox({ label, help, className, ...props }: { label: string; 
   const id = useId()
   return (
     <div className={cx('flex min-h-12 items-start gap-3', className)}>
-      <input id={id} type="checkbox" aria-describedby={help ? `${id}-help` : undefined} className="mt-0.5 size-7 shrink-0 accent-oliva" {...props} />
+      <input id={id} type="checkbox" aria-describedby={help ? `${id}-help` : undefined} className="mt-2 size-7 shrink-0 accent-oliva" {...props} />
       <div>
-        <label htmlFor={id} className="inline-block py-0.5 font-bold">{label}</label>
+        <label htmlFor={id} className="flex min-h-11 items-center font-bold">{label}</label>
         {help && <p id={`${id}-help`} className="text-apagado">{help}</p>}
       </div>
     </div>

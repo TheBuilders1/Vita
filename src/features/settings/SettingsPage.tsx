@@ -55,7 +55,7 @@ export function SettingsPage() {
         <Button onClick={restoreTips}>Recuperar consejos</Button>
       </Panel>
       <Panel title="Vuestro plan">
-        <p>Vita es gratuita mientras está en pruebas. <Link to="/planes" className="font-bold underline underline-offset-4">Ver los planes previstos</Link></p>
+        <p>Vita es gratuita mientras está en pruebas. <Link to="/planes" className="inline-flex min-h-11 items-center font-bold underline underline-offset-4">Ver los planes previstos</Link></p>
       </Panel>
       {canManage(actor, 'data') && <DeleteEverything />}
     </div>
@@ -87,10 +87,10 @@ function DeleteEverything() {
   const [open, setOpen] = useState(false)
   return (
     <Panel title="Borrar todo">
-      <Notice tone="warning">Elimina la familia, sus registros y sus archivos de este navegador. No hay copia en ningún otro sitio.</Notice>
+      <Notice tone="warning">Elimina el hogar, sus registros y sus archivos de este navegador. No hay copia en ningún otro sitio.</Notice>
       <div className="mt-4"><Button variant="danger" onClick={() => setOpen(true)}>Borrar todos los datos</Button></div>
       <WipeDialog open={open} title="Borrar todos los datos" confirmLabel="Borrar todos los datos" onClose={() => setOpen(false)} destination="/bienvenida">
-        Se eliminarán la familia, todos sus registros y todos sus archivos. No se puede deshacer.
+        Se eliminarán el hogar, todos sus registros y todos sus archivos. No se puede deshacer.
       </WipeDialog>
     </Panel>
   )

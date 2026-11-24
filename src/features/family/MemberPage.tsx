@@ -17,17 +17,17 @@ import type { Member, MemberInput } from '@/types/family'
 import { AccessEditor } from './AccessEditor'
 import { ProfileForm } from './ProfileForm'
 
-const back = <BackLink to="/familia">Volver a mi familia</BackLink>
+const back = <BackLink to="/hogar">Volver a mi hogar</BackLink>
 
 export function NewMemberPage() {
   const { actor } = useHome()
   const navigate = useNavigate()
   useTitle('Añadir integrante')
-  if (!canManage(actor, 'family')) return <Navigate to="/familia" replace />
+  if (!canManage(actor, 'family')) return <Navigate to="/hogar" replace />
   const save = async (input: MemberInput) => {
     const member = await repositories.family.addMember(actor.id, input)
-    toastStore.getState().show(`${member.name} ya está en la familia`)
-    void navigate('/familia')
+    toastStore.getState().show(`${member.name} ya forma parte del hogar`)
+    void navigate('/hogar')
   }
   return (
     <div className="mx-auto grid w-full max-w-3xl grid-cols-1 gap-6">
@@ -42,7 +42,7 @@ export function MemberPage() {
   const { members, actor } = useHome()
   const member = members.find((m) => m.id === memberId)
   useTitle(member?.name)
-  if (!member) return <Navigate to="/familia" replace />
+  if (!member) return <Navigate to="/hogar" replace />
   const manages = canManage(actor, 'family')
   const own = member.id === actor.id
   const save = async (input: MemberInput) => {
@@ -74,8 +74,8 @@ function RemoveMember({ member }: { member: Member }) {
   const remove = async () => {
     try {
       await repositories.family.removeMember(actor.id, member.id)
-      toastStore.getState().show(`${member.name} ya no está en la familia`)
-      void navigate('/familia')
+      toastStore.getState().show(`${member.name} ya no forma parte del hogar`)
+      void navigate('/hogar')
     } catch (cause) {
       setError(describeError(cause))
     }

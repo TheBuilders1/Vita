@@ -70,9 +70,9 @@ function Item({ item }: { item: FamilyRecord }) {
   const amount = [item.data.quantity, item.data.unit].filter(Boolean).join(' ')
   return (
     <li className="flex items-center gap-1 border-b-2 border-beige">
-      <button type="button" aria-pressed={bought} disabled={!canComplete(actor, item)} aria-label={`Comprado: ${String(item.data.name)}`} onClick={() => { repositories.records.setDone(actor.id, item.id, !bought).catch(fail) }} className="flex min-h-14 min-w-0 flex-1 items-center gap-3 px-1 text-left focus-visible:outline-offset-[-3px]">
+      <button type="button" aria-pressed={bought} disabled={!canComplete(actor, item)} onClick={() => { repositories.records.setDone(actor.id, item.id, !bought).catch(fail) }} className="flex min-h-14 min-w-0 flex-1 items-center gap-3 px-1 text-left focus-visible:outline-offset-[-3px]">
         <span className={`grid size-8 shrink-0 place-items-center border-2 ${bought ? 'border-oliva bg-oliva text-crema' : 'border-borde bg-crema'}`}>{bought && <Check aria-hidden="true" className="size-6" />}</span>
-        <span className={bought ? 'text-apagado line-through' : 'font-bold'}>{String(item.data.name)}{amount && <span className="font-normal">, {amount}</span>}</span>
+        <span className={bought ? 'text-apagado line-through' : 'font-bold'}><span className="sr-only">Comprado: </span>{String(item.data.name)}{amount && <span className="font-normal">, {amount}</span>}</span>
       </button>
       <button type="button" onClick={() => editor.open(item.id)} className="min-h-11 px-3 underline underline-offset-4">Ver<span className="sr-only"> {String(item.data.name)}</span></button>
     </li>

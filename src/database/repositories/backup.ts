@@ -27,7 +27,7 @@ export function createBackupRepository(ctx: RepositoryContext) {
       await requireManager(actorId)
       const [family, members, records, files] = await db.transaction('r', [db.families, db.members, db.records, db.files], () =>
         Promise.all([db.families.toCollection().first(), db.members.toArray(), db.records.toArray(), db.files.toArray()]))
-      if (!family) throw new NotFoundError('Todavía no hay ninguna familia')
+      if (!family) throw new NotFoundError('Todavía no hay ningún hogar')
       const attached = files.flatMap((f) => (f.recordId === undefined ? [] : [{ ...f, recordId: f.recordId }]))
       const encoded = await Promise.all(attached.map(async ({ blob, size: _size, ...file }) => ({ ...file, data: await blobToBase64(blob) })))
       await db.settings.put({ key: KEY, value: todayIso(now()) })

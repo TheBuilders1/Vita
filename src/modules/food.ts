@@ -9,7 +9,7 @@ export const ALLERGENS = options({
 
 const cooking = defineModule({
   id: 'cooking', floor: 'food', name: 'Cocinar',
-  description: 'Recetas de la familia y menú de la semana.',
+  description: 'Recetas de casa y menú de la semana.',
   recordTypes: [
     defineRecordType({
       id: 'recipe', name: 'Receta', plural: 'Recetas', titleField: 'title',

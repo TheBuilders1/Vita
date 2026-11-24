@@ -1,12 +1,12 @@
 import { CircleAlert, CircleCheck } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from 'zustand'
 import { toastStore } from '@/store'
 import type { Toast } from '@/store/toastStore'
 
-/** Con «Deshacer» hay que dar tiempo a leer y decidir. */
-const SUCCESS_MS = 5000
-const UNDO_MS = 10_000
+/** Con «Deshacer» hay que dar tiempo a leer y decidir (WCAG 2.2.1). El reloj se para con el ratón o el foco encima. */
+const SUCCESS_MS = 6000
+const UNDO_MS = 20_000
 const LINK = 'min-h-11 px-3 font-bold underline underline-offset-4'
 
 /** Las zonas vivas están siempre montadas: si no, el lector de pantalla no anuncia el primer aviso. */
@@ -24,16 +24,17 @@ function ToastCard({ toast }: { toast: Toast }) {
   const { dismiss } = toastStore.getState()
   const isError = toast.tone === 'error'
   const hasAction = toast.action !== undefined
+  const [held, setHeld] = useState(false)
 
   useEffect(() => {
-    if (isError) return
+    if (isError || held) return
     const timer = setTimeout(() => dismiss(toast.id), hasAction ? UNDO_MS : SUCCESS_MS)
     return () => clearTimeout(timer)
-  }, [dismiss, isError, hasAction, toast.id])
+  }, [dismiss, isError, held, hasAction, toast.id])
 
   const Icon = isError ? CircleAlert : CircleCheck
   return (
-    <div className={`on-dark pointer-events-auto flex w-full max-w-md flex-wrap items-center gap-x-3 gap-y-1 p-4 text-crema ${isError ? 'bg-peligro' : 'bg-oliva'}`}>
+    <div onPointerEnter={() => setHeld(true)} onPointerLeave={() => setHeld(false)} onFocus={() => setHeld(true)} onBlur={() => setHeld(false)} className={`on-dark pointer-events-auto flex w-full max-w-md flex-wrap items-center gap-x-3 gap-y-1 p-4 text-crema ${isError ? 'bg-peligro' : 'bg-oliva'}`}>
       <Icon aria-hidden="true" className="size-6 shrink-0" />
       <p className="min-w-40 flex-1 font-bold">{toast.message}</p>
       <div className="ml-auto flex flex-wrap justify-end">

@@ -8,7 +8,7 @@ const outings = defineModule({
       id: 'outing', name: 'Plan', plural: 'Planes', titleField: 'title',
       fields: {
         title: { kind: 'text', label: 'Plan', required: true },
-        kind: { kind: 'select', label: 'Tipo', required: true, options: options({ activity: 'Actividad', trip: 'Excursión', park: 'Parque', outing: 'Salida', holiday: 'Vacaciones', family: 'Plan en familia' }) },
+        kind: { kind: 'select', label: 'Tipo', required: true, options: options({ activity: 'Actividad', trip: 'Excursión', park: 'Parque', outing: 'Salida', holiday: 'Vacaciones', family: 'Plan todos juntos' }) },
         date: { kind: 'date', label: 'Fecha', required: true },
         endDate: { kind: 'date', label: 'Hasta' },
         time: { kind: 'time', label: 'Hora' },
@@ -111,7 +111,7 @@ const cybersecurity = defineModule({
 
 const digitalInfo = defineModule({
   id: 'digitalInfo', floor: 'leisure', name: 'Información digital',
-  description: 'Contrastar noticias y reconocer bulos en familia.',
+  description: 'Contrastar noticias y reconocer bulos en casa.',
   recordTypes: [
     defineRecordType({
       id: 'newsCheck', name: 'Noticia por contrastar', plural: 'Noticias contrastadas', titleField: 'headline',
@@ -131,7 +131,7 @@ const digitalInfo = defineModule({
 })
 
 const album = defineModule({
-  id: 'album', floor: 'leisure', name: 'Álbum familiar',
+  id: 'album', floor: 'leisure', name: 'Álbum del hogar',
   description: 'Fotos, recuerdos y archivos compartidos.',
   access: { member: 'write', vulnerable: 'write' },
   recordTypes: [

@@ -12,7 +12,7 @@ test('el asistente sigue los ocho pasos del encargo', () => {
 
 describe('validación por pasos', () => {
   test('cada paso revisa solo lo suyo', () => {
-    expect(validateStep(draft({ name: ' ' }), 'name', today)).toEqual({ name: 'Escribe el nombre de la familia' })
+    expect(validateStep(draft({ name: ' ' }), 'name', today)).toEqual({ name: 'Escribe el nombre del hogar' })
     expect(validateStep(draft({ name: ' ' }), 'ages', today)).toEqual({})
   })
   test('señala a la persona con el problema', () => {
@@ -24,7 +24,7 @@ describe('validación por pasos', () => {
     expect(validateStep(d, 'ages', today)).toEqual({ 'members.0.birthDate': 'La fecha de nacimiento no es válida', 'members.1.birthDate': 'La fecha de nacimiento no puede ser futura' })
   })
   test('hace falta al menos un máster', () => {
-    expect(validateStep(draft({ members: [person({ role: 'member' })] }), 'roles', today)).toEqual({ roles: 'Elige al menos un máster: es quien administra la familia' })
+    expect(validateStep(draft({ members: [person({ role: 'member' })] }), 'roles', today)).toEqual({ roles: 'Elige al menos un máster: es quien administra el hogar' })
   })
 })
 

@@ -54,7 +54,7 @@ export function BuildingPage() {
 
   return (
     <div className={cx('grid grid-cols-1 gap-3 lg:min-h-[34rem] lg:grow lg:basis-0 lg:grid-rows-[minmax(0,1fr)] lg:gap-6', module ? 'lg:grid-cols-[minmax(0,1fr)_minmax(28rem,38rem)]' : 'lg:grid-cols-[minmax(0,1fr)_25rem]')}>
-      <h1 className="sr-only">{title ?? 'El edificio de tu familia'}</h1>
+      <h1 className="sr-only">{title ?? 'El edificio de tu hogar'}</h1>
       <div className={cx('relative lg:h-full', module ? 'h-[30dvh] min-h-52' : 'h-[48dvh] min-h-72', 'lg:min-h-0 lg:overflow-y-auto')}>
         <BuildingView
           rooms={rooms}

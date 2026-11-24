@@ -59,11 +59,11 @@ function Content({ module }: { module: ModuleDef }) {
 
 function Closed({ module }: { module: ModuleDef }) {
   const { actor } = useHome()
-  if (accessTo(actor, module.id) === 'none') return <div className="mt-5"><Notice>Tu perfil no tiene acceso a esta habitación. Pídeselo a quien administra la familia.</Notice></div>
+  if (accessTo(actor, module.id) === 'none') return <div className="mt-5"><Notice>Tu perfil no tiene acceso a esta habitación. Pídeselo a quien administra el hogar.</Notice></div>
   return (
     <div className="mt-5">
       <Notice title="Esta habitación está cerrada" action={canManage(actor, 'modules') && <ButtonLink to="/ajustes#habitaciones">Elegir habitaciones</ButtonLink>}>
-        Vuestra familia no la usa. Lo que hubiera guardado se conserva.
+        En vuestro hogar no se usa. Lo que hubiera guardado se conserva.
       </Notice>
     </div>
   )

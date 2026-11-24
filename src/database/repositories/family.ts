@@ -10,7 +10,7 @@ import { applyRemoval, summarize, type RemovalSummary } from './removal'
 
 /** Lo que cada persona puede cambiar de su propio perfil sin ser máster. */
 const SELF_EDITABLE = new Set<string>(['name', 'birthDate', 'relationship'])
-const NEEDS_MASTER = 'La familia necesita al menos un máster'
+const NEEDS_MASTER = 'El hogar necesita al menos un máster'
 
 const parseFamily = (input: FamilyInput) => {
   const parsed = familyInputSchema.safeParse(input)
@@ -37,7 +37,7 @@ export function createFamilyRepository(ctx: RepositoryContext) {
   }
   const requireMember = async (id: string) => {
     const member = await db.members.get(id)
-    if (!member) throw new NotFoundError('Esa persona ya no está en la familia')
+    if (!member) throw new NotFoundError('Esa persona ya no está en el hogar')
     return member
   }
   const planMemberRemoval = async (id: string, heirId: string) =>
@@ -56,7 +56,7 @@ export function createFamilyRepository(ctx: RepositoryContext) {
       const members = input.members.map((m, i) => buildMember(m, i))
       if (!members.some((m) => m.role === 'master')) throw new ConflictError(NEEDS_MASTER)
       await db.transaction('rw', db.families, db.members, async () => {
-        if (await get()) throw new ConflictError('Ya hay una familia guardada en este dispositivo')
+        if (await get()) throw new ConflictError('Ya hay un hogar guardado en este dispositivo')
         await db.families.add(family)
         await db.members.bulkAdd(members)
       })
@@ -67,7 +67,7 @@ export function createFamilyRepository(ctx: RepositoryContext) {
       db.transaction('rw', db.families, db.members, async () => {
         await requireManager(actorId, 'modules')
         const current = await get()
-        if (!current) throw new NotFoundError('Todavía no hay ninguna familia')
+        if (!current) throw new NotFoundError('Todavía no hay ningún hogar')
         const parsed = parseFamily({ name: current.name, enabledModules: current.enabledModules, ...changes })
         const updated = { ...current, ...parsed, updatedAt: now().toISOString() }
         await db.families.put(updated)

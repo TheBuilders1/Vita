@@ -1,7 +1,6 @@
 @import 'tailwindcss';
 @import '@fontsource/atkinson-hyperlegible/latin-400.css';
 @import '@fontsource/atkinson-hyperlegible/latin-700.css';
-@import '@fontsource/pixelify-sans/latin-600.css';
 @import './tokens.css';
 
 @layer base {
@@ -43,6 +42,13 @@
 /* Los colores forzados del sistema eliminan las sombras: hace falta un borde real. */
 @media (forced-colors: active) {
   .pixel-edge { border: 2px solid ButtonBorder; }
+  /* Sin fondos propios, lo elegido y la pantalla actual no se distinguirían. */
+  [aria-current], [aria-pressed='true'], label:has(input:checked) { border: 4px solid Highlight; text-decoration: underline; }
+}
+
+/* El menú inferior del móvil no debe tapar lo que recibe el foco (WCAG 2.4.11). */
+@media (width < 48rem) {
+  html { scroll-padding-block: 1rem 6.5rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

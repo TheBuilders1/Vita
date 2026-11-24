@@ -33,7 +33,7 @@ export function createRecordRepository(ctx: RepositoryContext) {
 
   const requirePeople = async (ids: readonly string[]) => {
     const found = await db.members.bulkGet([...ids])
-    if (found.includes(undefined)) throw new NotFoundError('Esa persona ya no está en la familia')
+    if (found.includes(undefined)) throw new NotFoundError('Esa persona ya no está en el hogar')
   }
 
   /** Lo que no se puede ver se trata como inexistente, para no revelar que está ahí. */

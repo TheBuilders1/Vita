@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, KeyRound } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Flame } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router'
 import { useHomeQuery } from '@/app/providers/home'
@@ -27,7 +27,7 @@ export function OnboardingPage() {
   const form = useRef<HTMLFormElement>(null)
   const step = STEPS[index]!
   const isLast = index === STEPS.length - 1
-  useTitle('Crear mi familia')
+  useTitle('Crear mi hogar')
 
   useEffect(() => { heading.current?.focus(); window.scrollTo(0, 0) }, [index])
   // Tras un error, el foco va al primer dato que hay que corregir.
@@ -71,7 +71,7 @@ export function OnboardingPage() {
         <div role="alert" className="mt-4">{failure && <Notice tone="error">{failure}</Notice>}</div>
         <div className="mt-8 flex flex-wrap justify-between gap-3">
           {index > 0 ? <Button icon={ArrowLeft} onClick={() => { setErrors({}); setIndex(index - 1) }}>Atrás</Button> : <span />}
-          <Button type="submit" variant={isLast ? 'confirm' : 'primary'} icon={isLast ? KeyRound : ArrowRight} disabled={busy}>{isLast ? 'Entrar en casa' : 'Continuar'}</Button>
+          <Button type="submit" variant={isLast ? 'confirm' : 'primary'} icon={isLast ? Flame : ArrowRight} disabled={busy}>{isLast ? 'Entrar en casa' : 'Continuar'}</Button>
         </div>
       </form>
     </main>

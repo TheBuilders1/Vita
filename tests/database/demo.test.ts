@@ -57,7 +57,7 @@ test('la alergia de la ficha de emergencia coincide con la dieta', () => {
 describe('si ya hay una familia', () => {
   test('no se mezcla con ella', async () => {
     const before = await demo.db.records.count()
-    await expect(loadDemo(demo.db, demo.repos, today)).rejects.toThrow('Ya hay una familia')
+    await expect(loadDemo(demo.db, demo.repos, today)).rejects.toThrow('Ya hay un hogar')
     expect(await demo.db.records.count()).toBe(before)
   })
 })

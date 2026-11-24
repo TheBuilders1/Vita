@@ -33,7 +33,7 @@ export function BackupPanel() {
   return (
     <div id="copias" className="scroll-mt-4">
       <Panel title="Copias de seguridad">
-        <p>{last ? `Última copia: ${formatDate(last)}.` : 'Todavía no has hecho ninguna copia.'} Incluye la familia, los registros y los archivos.</p>
+        <p>{last ? `Última copia: ${formatDate(last)}.` : 'Todavía no has hecho ninguna copia.'} Incluye el hogar, los registros y los archivos.</p>
         <div className="my-4"><Notice tone="warning">El archivo no va cifrado y contiene también lo privado de cada persona. Guárdalo en un lugar seguro.</Notice></div>
         <div className="flex flex-wrap gap-2">
           <Button variant="primary" icon={Download} disabled={busy} onClick={() => { void download() }}>{busy ? 'Preparando…' : 'Guardar una copia'}</Button>

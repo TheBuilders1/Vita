@@ -28,8 +28,8 @@ export function AgendaRow({ item, showDate = false, size = 'md' }: AgendaRowProp
       <div className={`min-w-36 flex-1 leading-snug ${size === 'lg' ? 'text-xl' : ''}`}>
         <span className="sr-only">{category}: </span>
         {item.recordId
-          ? <button type="button" onClick={() => { if (item.recordId) editor.open(item.recordId) }} className={`min-h-6 text-left font-bold underline-offset-4 hover:underline ${item.done ? 'line-through' : ''}`}>{item.title}</button>
-          : <Link to="/familia" className="font-bold underline-offset-4 hover:underline">{item.title}</Link>}
+          ? <button type="button" onClick={() => { if (item.recordId) editor.open(item.recordId) }} className={`min-h-11 text-left font-bold underline-offset-4 hover:underline ${item.done ? 'line-through' : ''}`}>{item.title}</button>
+          : <Link to="/hogar" className="inline-flex min-h-11 items-center font-bold underline-offset-4 hover:underline">{item.title}</Link>}
         {when && <span className="block">{when.charAt(0).toUpperCase() + when.slice(1)}</span>}
         {details && <span className="block text-apagado">{details}</span>}
         {item.done && <span className="block text-apagado">{item.logStatus === 'skipped' ? 'No tomada' : 'Hecho'}</span>}

@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Fragment, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { Controller, useForm, type Resolver } from 'react-hook-form'
 import { useHome } from '@/app/providers/home'
 import { Button } from '@/components/ui/Button'
@@ -49,7 +49,16 @@ export function RecordFormDialog({ type, record, preset, onClose }: RecordFormPr
     }
   }
   const focusFirstError = () => requestAnimationFrame(() => form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus())
-  const requestClose = () => { if (isDirty || sharing.touched) setLeaving(true); else onClose() }
+  const unsaved = isDirty || sharing.touched
+  const requestClose = () => { if (unsaved) setLeaving(true); else onClose() }
+
+  // Recargar o cerrar la pestaña también perdería lo escrito.
+  useEffect(() => {
+    if (!unsaved) return
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [unsaved])
 
   return (
     <Dialog
@@ -78,7 +87,7 @@ export function RecordFormDialog({ type, record, preset, onClose }: RecordFormPr
           )} />
         ))}
         {type.visibility.locked
-          ? <Notice>Lo verá toda la familia: son datos para emergencias.</Notice>
+          ? <Notice>Lo verá todo el hogar: son datos para emergencias.</Notice>
           : <VisibilityInput value={sharing.visibility} sharedWith={sharing.sharedWith} canBePrivate={!record || record.ownerId === actor.id} onChange={(visibility, sharedWith) => setSharing({ visibility, sharedWith, touched: true })} />}
       </form>
     </Dialog>

@@ -22,9 +22,9 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
   }, [])
 
   if (status === 'ready') return children
-  if (status === 'opening') return <output className="block p-8">Abriendo tu casa…</output>
+  if (status === 'opening') return <output className="block p-8">Abriendo Vita…</output>
   return (
-    <MessagePage title="No podemos abrir tu casa">
+    <MessagePage title="No podemos abrir Vita">
       Este navegador no permite guardar datos locales o los tiene bloqueados. Comprueba que no estás en una ventana
       privada y que queda espacio, y vuelve a cargar la página.
     </MessagePage>

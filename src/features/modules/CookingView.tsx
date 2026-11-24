@@ -49,7 +49,7 @@ function WeekMenu() {
         {days.map((day) => (
           <li key={day} className={`p-3 ${day === today ? 'bg-aviso-fondo' : 'bg-yeso'}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h4 className="font-bold">{formatDay(day)}</h4>
+              <h3 className="font-bold">{formatDay(day)}</h3>
               {canPlan && <Button size="sm" icon={Plus} onClick={() => editor.create('mealPlan', { date: day })}>Añadir<span className="sr-only"> comida el {formatDay(day)}</span></Button>}
             </div>
             <ul>

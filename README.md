@@ -1,13 +1,13 @@
 # Vita
 
-- [Frontend](#frontend): aplicación web de gestión familiar. Guarda los datos en el navegador.
+- [Frontend](#frontend): aplicación web de gestión del hogar. Guarda los datos en el navegador.
 - [Backend](#backend): API de demostración del asistente por hogar.
 
 Hoy son independientes: el frontend todavía no usa la API.
 
 ## Frontend
 
-Gestión familiar en un espacio privado, alrededor de un edificio isométrico de cinco plantas.
+Gestión del hogar en un espacio privado, alrededor de un edificio isométrico de cinco plantas.
 Solo frontend: los datos se guardan en el navegador (IndexedDB) y no se envían a ningún servidor.
 
 > Los datos **no están cifrados**. Se pierden si se borra el almacenamiento del navegador, y los roles
@@ -34,7 +34,7 @@ pnpm check    # linter, tipos, tests y build
 | 5. Funcionalidad completa y demostración | Hecha |
 | 6. Refinamiento | Pendiente |
 
-Detalles en [docs/arquitectura.md](docs/arquitectura.md).
+Detalles en [docs/arquitectura.md](docs/arquitectura.md). Usabilidad y accesibilidad, en [docs/usabilidad.md](docs/usabilidad.md).
 
 ## Backend
 
@@ -83,7 +83,7 @@ OpenClaw se encarga de interpretar y delegar. No accede directamente a PostgreSQ
 | `migrations/` | Esquema relacional y datos ficticios iniciales. |
 | `openclaw/agents/` | Instrucciones y restricciones de los agentes `orquestador` y `documentos`. |
 | `openclaw/vita-tools/` | Plugin local que expone `vita_scan_document` y `vita_report_result`. |
-| `tests/` | Pruebas unitarias de los módulos principales. |
+| `tests/backend/` | Pruebas unitarias y de integración. El resto de `tests/` es del frontend. |
 
 #### Datos
 
@@ -143,7 +143,7 @@ export VITA_API_URL='http://127.0.0.1:8000'
 
 Verifica que los agentes tengan cargados sus `AGENTS.md` y que sus herramientas estén restringidas como se indica en el ejemplo:
 
-- `orquestador`: `sessions_spawn`, `sessions_yield` y `vita_report_result`; solo puede delegar en `documentos`.
+- `orquestador`: `sessions_spawn`, `sessions_yield` y `vita_report_result`; solo puede delegar en `documentos`. También lista `vita_scan_document`, porque un subagente nunca tiene más herramientas que quien lo crea; sus instrucciones le prohíben usarla.
 - `documentos`: solo `vita_scan_document`; no puede delegar, acceder a archivos directamente, ejecutar comandos ni usar navegador o mensajería.
 
 Si el Gateway corre en otro contenedor, no expongas el puerto en la LAN: configura una red privada compartida y restringe el acceso antes de cambiar `OPENCLAW_BASE_URL` y `VITA_API_URL`.
@@ -291,7 +291,14 @@ python -m pip install -e '.[dev]'
 python -m pytest
 ```
 
-La suite automatizada actual prueba validación de imágenes, selección conservadora de fechas OCR, manejo del cliente OpenClaw, autenticación/esquemas y cálculo horario del recordatorio. No levanta PostgreSQL ni OpenClaw. Para recorrer la demo completa manualmente hacen falta PostgreSQL, Tesseract y un Gateway privado con el plugin habilitado.
+Sin más configuración se ejecutan las pruebas unitarias: imágenes, fechas OCR, cliente OpenClaw, autenticación, esquemas y cálculo horario. Las de integración (`test_api.py`) levantan la API sobre PostgreSQL con un Gateway y un OCR simulados; se omiten si faltan estas variables:
+
+```bash
+export VITA_TEST_DATABASE_URL='postgresql://vita_api:CONTRASEÑA@127.0.0.1:PUERTO/vita_test'
+export VITA_TEST_MIGRATION_DATABASE_URL='postgresql://vita_migrator:CONTRASEÑA@127.0.0.1:PUERTO/vita_test'
+```
+
+La base debe terminar en `_test` porque **se vacía**, y haberse preparado con `database/init/01-roles.sh`. OpenClaw real no se prueba: para recorrer la demo completa hacen falta PostgreSQL, Tesseract y un Gateway privado con el plugin habilitado.
 
 ### Configuración de OpenClaw y variables
 

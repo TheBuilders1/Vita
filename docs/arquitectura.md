@@ -36,7 +36,8 @@ independientes (duplicación) y un CRUD solo genérico (parecería un panel de a
 ## Sistema visual
 Catálogo vivo en `/sistema`. Tokens en `src/styles/tokens.css`; `tests/styles/contrast.test.ts` exige AA en normal y AAA en contraste alto.
 - **Pieza firma**: esquina escalonada (`pixel-edge`) solo en lo pulsable y en las placas. Los paneles son planos con zócalo.
-- **Tipografía**: Atkinson Hyperlegible para todo; Pixelify Sans solo para la marca.
+- **Tipografía**: Atkinson Hyperlegible para todo.
+- **Marca**: dibujada en `components/layout/Logo.tsx` (la boca del hogar encendida con la V de «hecho»); el icono de la app es `public/favicon.svg`.
 - Botones de 48 px como mínimo y siempre con texto. Campos obligatorios por defecto; se marca lo opcional.
 - Los errores dentro de un diálogo se muestran en el propio diálogo. Los avisos flotantes de error no se cierran solos.
 - Rejillas con `grid-cols-1` explícito: sin él, el contenido largo desborda con texto muy grande.

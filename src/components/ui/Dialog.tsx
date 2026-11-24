@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useBlocker } from 'react-router'
 import { Button } from './Button'
 import { Notice } from './Notice'
 
@@ -8,6 +9,8 @@ interface DialogProps { open: boolean; onClose: () => void; title: string; child
 /**
  * <dialog> nativo: el navegador gestiona el foco y lo que queda detrás.
  * Escape pide cerrar, pero decide `onClose` (puede haber cambios sin guardar).
+ * «Atrás» hace lo mismo: en el móvil es la forma natural de cerrar y perdería lo escrito.
+ * Al cerrar, el foco vuelve a donde estaba; si ya no existe, al contenido.
  * Los errores van dentro (`error`): un aviso flotante quedaría inaccesible tras el velo.
  * En móvil ocupa toda la pantalla, con las acciones siempre a la vista.
  */
@@ -17,9 +20,14 @@ export function Dialog({ open, onClose, title, children, footer, error, wide = f
 
   useEffect(() => {
     const dialog = ref.current
-    if (!dialog) return
-    if (open && !dialog.open) dialog.showModal()
-    if (!open && dialog.open) dialog.close()
+    if (!dialog || !open) return
+    const opener = document.activeElement
+    dialog.showModal()
+    return () => {
+      dialog.close()
+      const target = opener instanceof HTMLElement && opener !== document.body && opener.isConnected ? opener : document.getElementById('contenido')
+      target?.focus({ preventScroll: true })
+    }
   }, [open])
 
   return (
@@ -29,6 +37,7 @@ export function Dialog({ open, onClose, title, children, footer, error, wide = f
       onCancel={(e) => { e.preventDefault(); onClose() }}
       className={`dialog-root m-auto max-h-[calc(100dvh-2rem)] border-4 border-marino bg-crema p-0 text-tinta max-sm:m-0 max-sm:h-dvh max-sm:max-h-none max-sm:w-screen max-sm:max-w-none max-sm:border-0 ${wide ? 'w-[min(52rem,calc(100vw-2rem))]' : 'w-[min(40rem,calc(100vw-2rem))]'}`}
     >
+      {open && <BackGuard onBack={onClose} />}
       {open && (
         <div className="flex max-h-[inherit] flex-col max-sm:h-full">
           <div className="flex items-start justify-between gap-4 px-5 pt-4 pb-3 sm:px-6">
@@ -42,6 +51,16 @@ export function Dialog({ open, onClose, title, children, footer, error, wide = f
       )}
     </dialog>
   )
+}
+
+function BackGuard({ onBack }: { onBack: () => void }) {
+  const blocker = useBlocker(({ historyAction }) => historyAction === 'POP')
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return
+    blocker.reset()
+    onBack()
+  }, [blocker, onBack])
+  return null
 }
 
 interface ConfirmProps extends Omit<DialogProps, 'footer'> { confirmLabel: string; onConfirm: () => void; busy?: boolean }

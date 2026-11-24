@@ -7,7 +7,7 @@ export function PlannerPage() {
   useTitle('Tareas y eventos')
   return (
     <div className="mx-auto grid w-full max-w-4xl grid-cols-1 gap-5">
-      <PageHeader title="Tareas y eventos" description="Lo de toda la familia que no es de ninguna habitación." />
+      <PageHeader title="Tareas y eventos" description="Lo de todo el hogar que no es de ninguna habitación." />
       <Panel><ModuleRecords moduleId="planner" /></Panel>
     </div>
   )

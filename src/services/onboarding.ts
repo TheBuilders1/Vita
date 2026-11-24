@@ -3,7 +3,7 @@ import { familyInputSchema, memberInputSchema, type FamilyInput, type MemberInpu
 import { ageOn } from '@/utils/dates'
 
 export const STEPS = [
-  { id: 'name', title: '¿Cómo se llama vuestra familia?' },
+  { id: 'name', title: '¿Cómo se llama vuestro hogar?' },
   { id: 'count', title: '¿Cuántas personas sois?' },
   { id: 'members', title: '¿Quiénes sois?' },
   { id: 'ages', title: '¿Cuándo nació cada persona?' },
@@ -42,7 +42,7 @@ export function validateStep(draft: Draft, step: StepId, today: string): StepErr
     return parsed.success ? {} : { name: parsed.error.issues[0]!.message }
   }
   if (step === 'roles') {
-    return draft.members.some((m) => m.role === 'master') ? {} : { roles: 'Elige al menos un máster: es quien administra la familia' }
+    return draft.members.some((m) => m.role === 'master') ? {} : { roles: 'Elige al menos un máster: es quien administra el hogar' }
   }
   const errors: StepErrors = {}
   const fields = MEMBER_FIELDS[step] ?? []

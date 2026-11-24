@@ -12,7 +12,7 @@ import { HomeContext, useHomeQuery } from './providers/home'
 const NAV: readonly NavItem[] = [
   { to: '/', label: 'Edificio', icon: Building2 },
   { to: '/calendario', label: 'Calendario', icon: CalendarDays },
-  { to: '/familia', label: 'Mi familia', icon: Users },
+  { to: '/hogar', label: 'Mi hogar', icon: Users },
   { to: '/ajustes', label: 'Ajustes', icon: Settings },
 ]
 /** Menos opciones para el perfil vulnerable; los ajustes siguen al pie de su portada. */
@@ -26,7 +26,7 @@ const SIMPLE_NAV: readonly NavItem[] = [
 export function AppLayout() {
   const home = useHomeQuery()
   const { pathname } = useLocation()
-  if (home === undefined) return <output className="block p-8">Abriendo tu casa…</output>
+  if (home === undefined) return <output className="block p-8">Abriendo Vita…</output>
   if (home === null) return <Navigate to={navigationStore.getState().entry} replace />
   const simple = home.actor.role === 'vulnerable'
   // El paisaje completo, solo donde está el edificio; con texto encima, suave.

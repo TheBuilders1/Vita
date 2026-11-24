@@ -23,7 +23,7 @@ describe('crear y consultar', () => {
     expect(await home.db.records.count()).toBe(0)
   })
   test('no admite personas ni registros inexistentes', async () => {
-    await expect(home.records.create(home.marta, task({ members: ['fantasma'] }))).rejects.toThrow('Esa persona ya no está en la familia')
+    await expect(home.records.create(home.marta, task({ members: ['fantasma'] }))).rejects.toThrow('Esa persona ya no está en el hogar')
     await expect(home.records.create(home.marta, { typeId: 'shoppingItem', data: { name: 'Pan', list: 'nada' } })).rejects.toThrow('El elemento elegido ya no existe')
   })
   test('una referencia debe ser del tipo correcto', async () => {
@@ -76,7 +76,7 @@ describe('visibilidad', () => {
     const r = await home.records.create(home.marta, { typeId: 'document', data: { title: 'Seguro', kind: 'insurance' } })
     await home.records.update(home.marta, r.id, { sharedWith: [home.andres, home.andres] })
     expect(await home.records.get(home.andres, r.id)).toMatchObject({ sharedWith: [home.andres] })
-    await expect(home.records.update(home.marta, r.id, { sharedWith: ['fantasma'] })).rejects.toThrow('Esa persona ya no está en la familia')
+    await expect(home.records.update(home.marta, r.id, { sharedWith: ['fantasma'] })).rejects.toThrow('Esa persona ya no está en el hogar')
   })
 })
 

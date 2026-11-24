@@ -1,8 +1,6 @@
 /* Única fuente de color de la interfaz. tests/styles/contrast.test.ts comprueba los pares. */
 @theme {
   --font-sans: 'Atkinson Hyperlegible', system-ui, sans-serif;
-  /* Solo para la marca: en textos se confunden a con o y el 2 con el 8. */
-  --font-pixel: 'Pixelify Sans', 'Atkinson Hyperlegible', sans-serif;
 
   --color-yeso: #e6decd;
   --color-crema: #fbf8f1;
@@ -18,6 +16,10 @@
   --color-oliva-honda: #39421d;
   --color-peligro: #8c2c20;
   --color-peligro-hondo: #5e1a12;
+
+  --color-logo-teja: #b8452f;
+  --color-logo-sol: #e0a53a;
+  --color-logo-tinta: #24344d;
 
   --color-info-fondo: #dde4ea;
   --color-exito-fondo: #e3e7d0;
@@ -77,4 +79,10 @@
   --color-cat-reminder: #1d1d1b;
   --color-cat-deadline: #5c2416;
   --color-cat-meal: #45370a;
+}
+
+/* El hogar de la marca, más vivo sobre fondo oscuro. */
+.on-dark {
+  --color-logo-teja: #ee8a68;
+  --color-logo-sol: #f3c65f;
 }

@@ -20,13 +20,13 @@ describe('crear la familia', () => {
   })
   test('solo hay una familia por dispositivo', async () => {
     await expect(home.family.setup({ family: { name: 'Otra', enabledModules: [] }, members: [person('X', 'master')] }))
-      .rejects.toThrow('Ya hay una familia guardada en este dispositivo')
+      .rejects.toThrow('Ya hay un hogar guardado en este dispositivo')
   })
   test('sin máster no se crea nada', async () => {
     const db = new VitaDb('vita-sin-master')
     const { family } = createRepositories(db)
     await expect(family.setup({ family: { name: 'A', enabledModules: [] }, members: [person('X', 'member')] }))
-      .rejects.toThrow('La familia necesita al menos un máster')
+      .rejects.toThrow('El hogar necesita al menos un máster')
     expect(await family.get()).toBeUndefined()
     expect(await family.listMembers()).toEqual([])
   })
@@ -58,7 +58,7 @@ describe('gestionar integrantes', () => {
     await expect(home.family.updateMember(home.andres, home.nora, { name: 'X' })).rejects.toThrow('No tienes permiso')
   })
   test('siempre queda un máster', async () => {
-    await expect(home.family.updateMember(home.marta, home.marta, { role: 'member' })).rejects.toThrow('La familia necesita al menos un máster')
+    await expect(home.family.updateMember(home.marta, home.marta, { role: 'member' })).rejects.toThrow('El hogar necesita al menos un máster')
     await home.family.updateMember(home.marta, home.andres, { role: 'master' })
     await home.family.updateMember(home.marta, home.marta, { role: 'member' })
     expect((await home.family.listMembers()).filter((m) => m.role === 'master').map((m) => m.id)).toEqual([home.andres])

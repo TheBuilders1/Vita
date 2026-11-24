@@ -47,7 +47,7 @@ export interface Member {
 }
 
 export const familyInputSchema = z.strictObject({
-  name: z.string({ error: 'Escribe el nombre de la familia' }).trim().min(1, 'Escribe el nombre de la familia').max(80, 'Como máximo 80 caracteres'),
+  name: z.string({ error: 'Escribe el nombre del hogar' }).trim().min(1, 'Escribe el nombre del hogar').max(80, 'Como máximo 80 caracteres'),
   enabledModules: z.array(moduleIdSchema).transform((ids) => [...new Set([...ids, ...ALWAYS_ON])]),
 })
 
