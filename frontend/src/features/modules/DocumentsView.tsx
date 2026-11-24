@@ -1,6 +1,7 @@
 import { CircleAlert, CircleCheck, Clock } from 'lucide-react'
 import { useHome } from '@/app/providers/home'
 import { useRecordEditor } from '@/features/records/editor'
+import { Attachments } from '@/features/records/Attachments'
 import { useToday } from '@/hooks/useToday'
 import { diffDays } from '@/utils/dates'
 import { formatDate } from '@/utils/format'
@@ -12,7 +13,8 @@ export function DocumentsView() {
   const { members } = useHome()
   const today = useToday()
   const editor = useRecordEditor()
-  const expiring = useRecords('document').filter((d) => d.data.expiryDate).toSorted((a, b) => String(a.data.expiryDate).localeCompare(String(b.data.expiryDate)))
+  const documents = useRecords('document')
+  const expiring = documents.filter((d) => d.data.expiryDate).toSorted((a, b) => String(a.data.expiryDate).localeCompare(String(b.data.expiryDate)))
   return (
     <div className="grid grid-cols-1 gap-6">
       {expiring.length > 0 && (
@@ -35,7 +37,8 @@ export function DocumentsView() {
         </Block>
       )}
       <ModuleRecords moduleId="documents" />
-      <p className="text-apagado">Los archivos se guardan en este navegador, sin cifrar.</p>
+      <Attachments records={documents} />
+      <p className="text-apagado">Los archivos se guardan en este navegador, sin cifrar. De los enlaces solo se guarda la dirección.</p>
     </div>
   )
 }

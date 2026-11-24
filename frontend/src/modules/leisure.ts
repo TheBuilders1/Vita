@@ -142,6 +142,7 @@ const album = defineModule({
         date: { kind: 'date', label: 'Fecha', required: true },
         members: { kind: 'members', label: 'Quién aparece' },
         files: { kind: 'files', label: 'Fotos y archivos' },
+        links: { kind: 'links', label: 'Enlaces' },
         story: { kind: 'textarea', label: 'Historia' },
       },
     }),

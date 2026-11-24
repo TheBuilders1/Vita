@@ -14,11 +14,16 @@ import { useTips } from '@/hooks/useTips'
 import type { Floor } from '@/modules/floors'
 import type { ModuleDef } from '@/modules/types'
 import { accessTo, canManage } from '@/services/permissions'
+import { revealIfHiddenBelow } from '@/utils/reveal'
 
 export function ModulePanel({ module, floor, enabled }: { module: ModuleDef; floor: Floor; enabled: boolean }) {
   const heading = useRef<HTMLHeadingElement>(null)
   // Al entrar en una habitación, el foco y el lector de pantalla van a su nombre.
-  useEffect(() => { heading.current?.focus({ preventScroll: true }) }, [module.id])
+  useEffect(() => {
+    if (!heading.current) return
+    heading.current.focus({ preventScroll: true })
+    revealIfHiddenBelow(heading.current)
+  }, [module.id])
   return (
     <section aria-labelledby="module-title" className="bg-crema p-4 shadow-panel sm:p-6">
       <BackLink to={`/planta/${floor.id}`}>{`Volver a ${floor.name}`}</BackLink>

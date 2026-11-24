@@ -10,7 +10,7 @@ export const NEEDS = ['dependency', 'disability', 'allergy', 'intolerance', 'new
 export type Need = (typeof NEEDS)[number]
 
 const moduleIds = MODULES.map((m) => m.id) as [ModuleId, ...ModuleId[]]
-const moduleIdSchema = z.enum(moduleIds, { error: 'Ese módulo no existe' })
+export const moduleIdSchema = z.enum(moduleIds, { error: 'Ese módulo no existe' })
 const accessSchema = z.enum(['none', 'read', 'write'], { error: 'Elige un permiso' })
 
 /** Módulos que siempre están encendidos. */

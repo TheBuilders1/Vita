@@ -40,7 +40,7 @@ export function fieldText(record: FamilyRecord, name: string, { members, records
       return target ? recordTitle(target, { members, records }) : ''
     }
     case 'choices': return (value as string[]).map((v) => field.options.find((o) => o.value === v)?.label ?? v).join(', ')
-    case 'tags': case 'times': return (value as string[]).join(', ')
+    case 'tags': case 'times': case 'links': return (value as string[]).join(', ')
     default: return String(value)
   }
 }

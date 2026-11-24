@@ -5,6 +5,7 @@ import type { FamilyRecord } from '@/types/records'
 import { addDays, ageOn, diffDays } from '@/utils/dates'
 import { buildAgenda } from './agenda'
 import { monthSummary } from './finance'
+import { suggestModules } from './onboarding'
 import { hasSevere, rankRecipes } from './recipes'
 import { fieldText, recordTitle, titleContext } from './titles'
 
@@ -35,6 +36,16 @@ const within = (today: string, date: unknown, days: number) => typeof date === '
 
 /** El identificador incluye el periodo para que un consejo descartado pueda volver más adelante. */
 const RULES: readonly Rule[] = [
+  function missingRooms({ members, today, enabled }) {
+    // Solo lo que depende de las personas: lo general puede estar cerrado a propósito.
+    const missing = [...suggestModules({ members, hasPets: false }, today)].filter(([id, reason]) => reason !== '' && !enabled.includes(id))
+    if (missing.length === 0) return []
+    const reasons = [...new Set(missing.map(([, reason]) => reason))].join('. ')
+    return [{
+      id: `rooms:${missing.map(([id]) => id).toSorted().join()}`, moduleId: 'planner', title: 'Hay habitaciones que os pueden servir',
+      text: `${missing.map(([id]) => getModule(id).name).join(', ')}. ${reasons}.`, link: '/ajustes#habitaciones',
+    }]
+  },
   function emergencyContacts({ records }) {
     if (ofType(records, 'emergencyContact').length > 0) return []
     return [{ id: 'contacts', moduleId: 'emergency', title: 'Prepara los contactos de emergencia', text: 'Añade a una o dos personas de confianza. Si pasa algo, estarán a un toque.' }]

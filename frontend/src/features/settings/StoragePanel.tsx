@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useStore } from 'zustand'
 import { Button } from '@/components/ui/Button'
 import { Panel } from '@/components/ui/Panel'
-import { toastStore } from '@/store'
+import { SERVER_HOUSEHOLD } from '@/services/homeServer'
+import { settingsStore, toastStore } from '@/store'
 import { formatBytes } from '@/utils/format'
 
 interface Storage { usage: number | undefined; persisted: boolean }
@@ -15,6 +17,7 @@ async function inspect(): Promise<Storage> {
 
 export function StoragePanel() {
   const [storage, setStorage] = useState<Storage>()
+  const sends = useStore(settingsStore, (s) => s.settings.photoReading) && SERVER_HOUSEHOLD !== null
   useEffect(() => { inspect().then(setStorage).catch(() => setStorage({ usage: undefined, persisted: false })) }, [])
 
   const protect = async () => {
@@ -27,7 +30,7 @@ export function StoragePanel() {
   return (
     <Panel title="Privacidad y almacenamiento">
       <div className="grid grid-cols-1 gap-3">
-        <p>Todo se guarda en este navegador, sin cifrar. Nada se envía a ningún servidor.</p>
+        <p>Todo se guarda en este navegador, sin cifrar. {sends ? 'Al servidor de tu hogar solo van las fotos de documentos que mandes leer.' : 'Nada se envía a ningún servidor.'}</p>
         <p>Los datos se pierden si borras los datos de navegación, usas una ventana privada o cambias de dispositivo.</p>
         {storage?.usage !== undefined && <p>Espacio usado por Vita: <strong>{formatBytes(storage.usage)}</strong></p>}
         {storage && (storage.persisted

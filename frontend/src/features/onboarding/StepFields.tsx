@@ -16,11 +16,13 @@ export function StepFields({ step, ...props }: StepProps & { step: StepId }) {
   switch (step) {
     case 'name':
       return <TextInput label="Nombre del hogar" required autoComplete="off" value={draft.name} error={errors.name} help="Por ejemplo: Los Robles." onChange={(e) => onChange({ name: e.target.value })} />
+    case 'you':
+      return <You {...props} />
     case 'count':
       return <Count {...props} />
     case 'members':
       return (
-        <People {...props}>{(m, i, set) => (
+        <People {...props} others>{(m, i, set) => (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <TextInput label="Nombre" required autoComplete="off" value={m.name} error={errors[`members.${i}.name`]} onChange={(e) => set({ name: e.target.value })} />
             <TextInput label="Parentesco" required autoComplete="off" value={m.relationship} error={errors[`members.${i}.relationship`]} help="Por ejemplo: madre, hijo, abuela." onChange={(e) => set({ relationship: e.target.value })} />
@@ -29,7 +31,7 @@ export function StepFields({ step, ...props }: StepProps & { step: StepId }) {
       )
     case 'ages':
       return (
-        <People {...props}>{(m, i, set) => (
+        <People {...props} others>{(m, i, set) => (
           <TextInput label="Fecha de nacimiento" required type="date" max={today} value={m.birthDate} error={errors[`members.${i}.birthDate`]} onChange={(e) => set({ birthDate: e.target.value })} />
         )}</People>
       )
@@ -69,6 +71,20 @@ export function StepFields({ step, ...props }: StepProps & { step: StepId }) {
   }
 }
 
+function You({ draft, errors, today, onChange }: StepProps) {
+  const [you, ...others] = draft.members
+  if (!you) return null
+  const set = (changes: Partial<DraftMember>) => onChange({ members: [{ ...you, ...changes }, ...others] })
+  return (
+    <div className="grid grid-cols-1 gap-4">
+      <TextInput label="Tu nombre" required autoComplete="off" value={you.name} error={errors['members.0.name']} onChange={(e) => set({ name: e.target.value })} />
+      <TextInput label="Qué eres en tu hogar" required autoComplete="off" value={you.relationship} error={errors['members.0.relationship']} help="Por ejemplo: madre, hijo, abuela." onChange={(e) => set({ relationship: e.target.value })} />
+      <TextInput label="Tu fecha de nacimiento" required type="date" max={today} value={you.birthDate} error={errors['members.0.birthDate']} onChange={(e) => set({ birthDate: e.target.value })} />
+      <p>Serás quien administra el hogar. Con esto ya puedes entrar; lo demás se completa ahora o cuando quieras.</p>
+    </div>
+  )
+}
+
 function Count({ draft, onChange }: StepProps) {
   const set = (count: number) => onChange({ members: resizeMembers(draft.members, count) })
   const count = draft.members.length
@@ -84,15 +100,15 @@ function Count({ draft, onChange }: StepProps) {
   )
 }
 
-function People({ draft, onChange, children }: StepProps & { children: (member: DraftMember, index: number, set: (changes: Partial<DraftMember>) => void) => ReactNode }) {
+function People({ draft, onChange, others = false, children }: StepProps & { others?: boolean; children: (member: DraftMember, index: number, set: (changes: Partial<DraftMember>) => void) => ReactNode }) {
   return (
     <div className="grid grid-cols-1 gap-6">
-      {draft.members.map((member, i) => (
+      {draft.members.map((member, i) => (others && i === 0 ? null : (
         <fieldset key={i} className="min-w-0 border-l-4 border-beige pl-4">
           <legend className="mb-2 text-lg font-bold">{member.name.trim() || (i === 0 ? 'Tú' : `Persona ${i + 1}`)}</legend>
           {children(member, i, (changes) => onChange({ members: draft.members.map((m, j) => (j === i ? { ...m, ...changes } : m)) }))}
         </fieldset>
-      ))}
+      )))}
     </div>
   )
 }

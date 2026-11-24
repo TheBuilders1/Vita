@@ -1,6 +1,7 @@
 import type { RefCallBack } from 'react-hook-form'
 import { useHome } from '@/app/providers/home'
 import { FilesInput } from '@/components/form/FilesInput'
+import { LinksInput } from '@/components/form/LinksInput'
 import { ChoicesInput, IngredientsInput, NumberInput, TagsInput, TimesInput, WeekdaysInput } from '@/components/form/ListInputs'
 import { MoneyInput } from '@/components/form/MoneyInput'
 import { Checkbox, SelectInput, TextArea, TextInput } from '@/components/ui/Field'
@@ -16,12 +17,13 @@ interface FieldControlProps {
   people: readonly Member[]
   inputRef: RefCallBack
   onChange: (value: unknown) => void
+  onBusy: (busy: boolean) => void
 }
 
 const list = <T,>(value: unknown) => (value ?? []) as T[]
 
 /** Un control por tipo de campo: es todo lo que necesita un módulo nuevo para tener formulario. */
-export function FieldControl({ field, value, error, people, inputRef, onChange }: FieldControlProps) {
+export function FieldControl({ field, value, error, people, inputRef, onChange, onBusy }: FieldControlProps) {
   const { records, members } = useHome()
   const info = { label: field.label, help: field.help, error, required: field.required ?? false }
   const text = { ...info, ref: inputRef, value: String(value ?? ''), onChange: (e: { target: { value: string } }) => onChange(e.target.value) }
@@ -51,6 +53,7 @@ export function FieldControl({ field, value, error, people, inputRef, onChange }
     case 'tags': return <TagsInput {...info} value={list<string>(value)} onChange={onChange} />
     case 'times': return <TimesInput {...info} value={list<string>(value)} onChange={onChange} />
     case 'ingredients': return <IngredientsInput {...info} value={list<Ingredient>(value)} onChange={onChange} />
-    case 'files': return <FilesInput {...info} value={list<string>(value)} onChange={onChange} />
+    case 'files': return <FilesInput {...info} value={list<string>(value)} onChange={onChange} onBusy={onBusy} />
+    case 'links': return <LinksInput {...info} value={list<string>(value)} onChange={onChange} />
   }
 }

@@ -21,6 +21,9 @@ Evaluación del 2026-11-24 sobre la app real (Chromium), con el hogar de ejemplo
 | El foco se perdía al borrar, completar o cambiar de pantalla | 2.4.3 | Corregido: `useFocusGuard` |
 | Cambiar de pantalla no se anunciaba | 4.1.3 | Corregido: `RouteAnnouncer` |
 | En móvil, el menú inferior tapaba 13 elementos enfocados | 2.4.11 | Corregido: 0 tapados |
+| En móvil, al entrar en una habitación el menú podía tapar su título, y al volver se perdía el foco | 2.4.11, 2.4.3 | Corregido: el título queda a la vista y al volver se enfoca la misma habitación |
+| En móvil, la vista sencilla se montaba encima del ascensor y las plantas | 1.4.10 | Corregido: el alto fijo es solo del 3D |
+| A 320 px con letra muy grande se cortaban «Ajustes» y la vista sencilla | 1.4.10 | Corregido |
 | Enlaces y botones de 22 a 27 px de alto | 2.5.8 (24 px) | Corregido: 44 px o más |
 | «Deshacer» caducaba a los 10 s | 2.2.1 | Corregido: 20 s, y se para con el ratón o el foco encima |
 | En la compra, el nombre accesible no incluía la cantidad visible | 2.5.3 | Corregido |
@@ -35,7 +38,7 @@ Ya cumplía: idioma, un `h1` por pantalla, zonas, enlace «Saltar al contenido»
 
 | Heurística | Valoración | Gravedad pendiente |
 |---|---|---|
-| 1. Visibilidad del estado | Avisos al guardar, «Paso 2 de 8», pendientes por habitación, pantalla actual marcada | 0 |
+| 1. Visibilidad del estado | Avisos al guardar, «Paso 1 de 2», pendientes por habitación, pantalla actual marcada | 0 |
 | 2. Lenguaje del mundo real | Palabras de casa, sin jerga; fechas como «Ayer» | 0. «Máster del hogar» puede sonar técnico (1) |
 | 3. Control y libertad | «Atrás» **perdía lo escrito sin avisar** (4): corregido. «Hecho» se deshace | Borrar pide confirmación, pero no se deshace (2) |
 | 4. Consistencia | Mismos botones, diálogos y verbos en todas las habitaciones | 0 |
@@ -46,7 +49,7 @@ Ya cumplía: idioma, un `h1` por pantalla, zonas, enlace «Saltar al contenido»
 | 9. Recuperarse de errores | Mensajes concretos junto al campo; si falla una pantalla, el menú sigue | 0 |
 | 10. Ayuda | Textos de ayuda en los campos y guías por módulo | No hay una ayuda general (2) |
 
-Asistente de alta: conserva lo escrito al recargar, pero vuelve al paso 1, y «atrás» del navegador sale de él (2).
+Asistente de alta: dos pasos imprescindibles y los demás opcionales. El paso va en la dirección: recargar, «atrás» y salir y volver conservan el paso y lo escrito mientras no se cierre la pestaña. Corregido.
 
 ## 4. Los mitos de usabilidad, en web y en móvil
 
@@ -113,5 +116,4 @@ Al acabar, cuestionario SUS; objetivo, 75 o más.
 3. axe en la CI (añade una dependencia de desarrollo: pedir permiso).
 4. Deshacer un borrado.
 5. Compactar los controles del calendario en móvil.
-6. Guardar el paso del asistente y que «atrás» retroceda un paso.
-7. Búsqueda global y página de ayuda.
+6. Búsqueda global y página de ayuda.

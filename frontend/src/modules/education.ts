@@ -64,6 +64,7 @@ const grants = defineModule({
         status: { kind: 'select', label: 'Estado', required: true, options: options({ pending: 'Por preparar', preparing: 'Reuniendo documentos', submitted: 'Presentada', granted: 'Concedida', denied: 'Denegada' }) },
         requirements: { kind: 'tags', label: 'Documentos necesarios' },
         files: { kind: 'files', label: 'Archivos' },
+        links: { kind: 'links', label: 'Enlaces' },
         notes: { kind: 'textarea', label: 'Notas' },
       },
       rules: [notBefore('openDate', 'deadline', 'El último día no puede ser anterior a la apertura')],

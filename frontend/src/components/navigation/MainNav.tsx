@@ -15,7 +15,7 @@ export function MainNav({ items }: { items: readonly NavItem[] }) {
               to={to}
               end
               className={({ isActive }) => cx(
-                'flex min-h-14 items-center justify-center gap-x-2.5 px-3 font-bold text-crema focus-visible:outline-offset-[-4px] max-md:flex-col max-md:px-1 max-md:py-1.5 max-md:text-sm max-md:leading-tight',
+                'flex min-h-14 items-center justify-center gap-x-2.5 px-3 font-bold text-crema focus-visible:outline-offset-[-4px] max-md:flex-col max-md:px-1 max-md:py-1.5 max-md:text-[min(0.875rem,5vw)] max-md:leading-tight',
                 isActive ? 'bg-crema text-tinta!' : 'hover:bg-marino-hondo',
               )}
             >

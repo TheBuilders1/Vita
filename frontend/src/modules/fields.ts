@@ -1,5 +1,6 @@
 import * as z from 'zod'
 import { isIsoDate, isTime } from '@/utils/dates'
+import { isWebLink, tidyLink } from '@/utils/webLinks'
 
 /**
  * Los campos declarados por cada módulo son la única fuente de verdad:
@@ -8,11 +9,17 @@ import { isIsoDate, isTime } from '@/utils/dates'
 export interface Option { readonly value: string; readonly label: string }
 export interface Ingredient { name: string; quantity?: number | undefined; unit?: string | undefined }
 
-interface FieldBase { readonly label: string; readonly required?: boolean; readonly help?: string }
+interface FieldBase {
+  readonly label: string
+  readonly required?: boolean
+  readonly help?: string
+  /** Lo escribe la app; no aparece en formularios ni listados. */
+  readonly hidden?: boolean
+}
 interface SimpleField extends FieldBase {
   readonly kind:
     | 'date' | 'time' | 'money' | 'boolean' | 'tags' | 'times' | 'weekdays'
-    | 'member' | 'members' | 'files' | 'ingredients' | 'phone' | 'url'
+    | 'member' | 'members' | 'files' | 'ingredients' | 'phone' | 'url' | 'links'
 }
 interface TextField extends FieldBase { readonly kind: 'text' | 'textarea'; readonly maxLength?: number }
 interface NumberField extends FieldBase { readonly kind: 'number' | 'integer'; readonly min?: number; readonly max?: number; readonly unit?: string }
@@ -32,10 +39,10 @@ export interface Rule {
 interface ValueByKind {
   text: string; textarea: string; date: string; time: string; phone: string; url: string
   money: number; number: number; integer: number; boolean: boolean
-  tags: string[]; times: string[]; weekdays: number[]; members: string[]; files: string[]
+  tags: string[]; times: string[]; weekdays: number[]; members: string[]; files: string[]; links: string[]
   ingredients: Ingredient[]; member: string; record: string; select: string; choices: string[]
 }
-type AlwaysPresent = 'boolean' | 'choices' | 'tags' | 'times' | 'weekdays' | 'members' | 'files' | 'ingredients'
+type AlwaysPresent = 'boolean' | 'choices' | 'tags' | 'times' | 'weekdays' | 'members' | 'files' | 'links' | 'ingredients'
 type ValueOf<F extends Field> = F extends { kind: 'select'; options: readonly { value: infer V }[] } ? V : ValueByKind[F['kind']]
 type IsPresent<F extends Field> = F['kind'] extends AlwaysPresent ? true : F extends { required: true } ? true : false
 
@@ -48,6 +55,8 @@ export type InferData<F extends Fields> = {
 export const REQUIRED_MESSAGE = 'Este dato es obligatorio'
 const TEXT_MAX = 200
 const TEXTAREA_MAX = 5000
+export const LINK_MAX = 2000
+export const MAX_LINKS = 20
 
 const blankToUndefined = (value: unknown) =>
   value === null || (typeof value === 'string' && value.trim() === '') ? undefined : value
@@ -70,6 +79,9 @@ const uniqueTexts = (values: string[]) => [...new Set(values.map((v) => v.trim()
 const dateSchema = z.string({ error: 'La fecha no es válida' }).refine(isIsoDate, 'La fecha no es válida')
 const timeSchema = z.string({ error: 'La hora no es válida' }).refine(isTime, 'La hora no es válida')
 const isHttpUrl = (value: string) => /^https?:$/.test(URL.parse(value)?.protocol ?? '')
+
+const linkSchema = z.string().max(LINK_MAX, `Como máximo ${LINK_MAX} caracteres`)
+  .refine(isWebLink, { error: ({ input }) => `«${String(input)}» no es un enlace. Debe parecerse a www.ejemplo.es` })
 
 const ingredientSchema = z.strictObject({
   name: text(TEXT_MAX).min(1, REQUIRED_MESSAGE),
@@ -100,6 +112,7 @@ function listSchema(field: Field): z.ZodType<unknown[]> | undefined {
   switch (field.kind) {
     case 'tags': case 'members': case 'files': return z.array(z.string()).transform(uniqueTexts)
     case 'choices': return z.array(z.enum(optionValues(field), { error: 'Elige una de las opciones' })).transform((v) => [...new Set(v)])
+    case 'links': return z.array(z.string()).transform((links) => uniqueTexts(links.map(tidyLink))).pipe(z.array(linkSchema).max(MAX_LINKS, `Como máximo ${MAX_LINKS} enlaces`))
     case 'times': return z.array(timeSchema).transform(uniqueSorted)
     case 'weekdays': return z.array(number({ min: 1, max: 7 }, true)).transform(uniqueSorted)
     case 'ingredients': return z.array(ingredientSchema)

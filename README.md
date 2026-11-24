@@ -3,12 +3,12 @@
 - [Frontend](#frontend): aplicación web de gestión del hogar. Guarda los datos en el navegador.
 - [Backend](#backend): API de demostración del asistente por hogar.
 
-Hoy son independientes: el frontend todavía no usa la API.
+El frontend funciona sin la API. De forma opcional la usa para leer la caducidad de un documento a partir de su foto: ver [`frontend/README.md`](frontend/README.md).
 
 ## Frontend
 
 Gestión del hogar en un espacio privado, alrededor de un edificio isométrico de cinco plantas.
-Solo frontend: los datos se guardan en el navegador (IndexedDB) y no se envían a ningún servidor.
+Los datos se guardan en el navegador (IndexedDB). Solo salen las fotos de documentos que se manden leer, si se activa esa opción.
 
 > Los datos **no están cifrados**. Se pierden si se borra el almacenamiento del navegador, y los roles
 > simulan permisos dentro de la app: no protegen frente a quien use este dispositivo.

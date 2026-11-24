@@ -52,3 +52,12 @@ test('cargar sustituye los valores por los guardados', async () => {
   await store.getState().load()
   expect(store.getState().settings.motion).toBe('reduced')
 })
+
+test('leer fotos en el servidor viene apagado y hay que activarlo', async () => {
+  const { db, repo } = open()
+  expect((await repo.load()).photoReading).toBe(false)
+  await db.settings.put({ key: 'preferences', value: { textSize: 'large' } })
+  expect(await repo.load()).toMatchObject({ textSize: 'large', photoReading: false })
+  await db.settings.put({ key: 'preferences', value: { photoReading: 'si' } })
+  expect((await repo.load()).photoReading).toBe(false)
+})

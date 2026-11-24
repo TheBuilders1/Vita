@@ -71,7 +71,7 @@ export function Checkbox({ label, help, className, ...props }: { label: string; 
   return (
     <div className={cx('flex min-h-12 items-start gap-3', className)}>
       <input id={id} type="checkbox" aria-describedby={help ? `${id}-help` : undefined} className="mt-2 size-7 shrink-0 accent-oliva" {...props} />
-      <div>
+      <div className="min-w-0 hyphens-auto [overflow-wrap:anywhere]">
         <label htmlFor={id} className="flex min-h-11 items-center font-bold">{label}</label>
         {help && <p id={`${id}-help`} className="text-apagado">{help}</p>}
       </div>
@@ -91,10 +91,10 @@ export function RadioGroup({ legend, help, name, value, options, onChange }: Rad
         {options.map((o) => (
           <label
             key={o.value}
-            className="flex min-h-12 items-center gap-3 border-2 border-borde bg-crema px-4 py-2 has-checked:border-marino has-checked:bg-marino has-checked:text-crema has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-foco"
+            className="flex min-h-12 max-w-full items-center gap-3 border-2 border-borde bg-crema px-4 py-2 max-[24rem]:gap-2 max-[24rem]:px-2 has-checked:border-marino has-checked:bg-marino has-checked:text-crema has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-foco"
           >
-            <input type="radio" name={name} value={o.value} checked={o.value === value} onChange={() => onChange(o.value)} className="size-5 accent-crema outline-none" />
-            <span><span className="font-bold">{o.label}</span>{o.hint && <span className="block">{o.hint}</span>}</span>
+            <input type="radio" name={name} value={o.value} checked={o.value === value} onChange={() => onChange(o.value)} className="size-5 shrink-0 accent-crema outline-none" />
+            <span className="min-w-0 hyphens-auto [overflow-wrap:anywhere]"><span className="font-bold">{o.label}</span>{o.hint && <span className="block">{o.hint}</span>}</span>
           </label>
         ))}
       </div>

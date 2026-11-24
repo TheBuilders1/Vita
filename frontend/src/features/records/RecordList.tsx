@@ -82,13 +82,13 @@ function RecordRow({ record, type, context }: { record: FamilyRecord; type: Reco
   )
 }
 
-const SKIP: ReadonlySet<Field['kind']> = new Set(['textarea', 'files', 'ingredients', 'boolean', 'weekdays', 'choices'])
+const SKIP: ReadonlySet<Field['kind']> = new Set(['textarea', 'files', 'links', 'ingredients', 'boolean', 'weekdays', 'choices'])
 
 /** Los datos más útiles en una línea, sin repetir el título. */
 function summary(type: RecordTypeDef, record: FamilyRecord, context: TitleContext): string {
   const title = recordTitle(record, context)
   return Object.entries(type.fields)
-    .filter(([name, f]) => name !== type.titleField && !SKIP.has(f.kind))
+    .filter(([name, f]) => name !== type.titleField && !f.hidden && !SKIP.has(f.kind))
     .map(([name]) => fieldText(record, name, context))
     .filter((text) => text && !title.includes(text))
     .slice(0, 4)

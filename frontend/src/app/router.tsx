@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router'
+import { createBrowserRouter, redirect } from 'react-router'
 import { AppLayout } from './AppLayout'
 import { HomePage } from './HomePage'
 import { NotFoundPage } from './NotFoundPage'
@@ -31,12 +31,15 @@ export const router = createBrowserRouter([
               { path: '/hogar/nuevo', lazy: async () => ({ Component: (await import('@/features/family/MemberPage')).NewMemberPage }) },
               { path: '/hogar/:memberId', lazy: async () => ({ Component: (await import('@/features/family/MemberPage')).MemberPage }) },
               { path: '/ajustes', lazy: async () => ({ Component: (await import('@/features/settings/SettingsPage')).SettingsPage }) },
+              { path: '/vita', lazy: async () => ({ Component: (await import('@/features/chat/ChatPage')).ChatPage }) },
               { path: '/planes', lazy: async () => ({ Component: (await import('@/features/plans/PlansPage')).PlansPage }) },
             ],
           },
         ],
       },
       { path: '/sistema', lazy: async () => ({ Component: (await import('@/features/system/SystemPage')).SystemPage }) },
+      // Direcciones anteriores: «familia» pasó a llamarse «hogar».
+      { path: '/familia/*', loader: ({ params }) => redirect(params['*'] ? `/hogar/${params['*']}` : '/hogar') },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

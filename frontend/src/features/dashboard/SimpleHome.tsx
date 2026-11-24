@@ -1,4 +1,4 @@
-import { Building2, CalendarDays, Phone, Settings } from 'lucide-react'
+import { Building2, CalendarDays, MessageCircle, Phone, Settings } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { useStore } from 'zustand'
@@ -43,6 +43,7 @@ export function SimpleHome() {
         </div>
       </section>
       <div className="flex flex-wrap gap-3">
+        <ButtonLink to="/vita" size="lg" icon={MessageCircle}>Pídeselo a Vita</ButtonLink>
         <ButtonLink to="/calendario" size="lg" icon={CalendarDays}>Mi calendario</ButtonLink>
         <ButtonLink to="/edificio" size="lg" icon={Building2}>Ver la casa</ButtonLink>
       </div>

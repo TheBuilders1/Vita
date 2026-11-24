@@ -122,8 +122,12 @@ const documents = defineModule({
         member: { kind: 'member', label: 'De quién es' },
         issueDate: { kind: 'date', label: 'Fecha de expedición' },
         expiryDate: { kind: 'date', label: 'Fecha de caducidad' },
+        // De dónde salió la caducidad: solo vale mientras coincida con la fecha guardada.
+        scannedDate: { kind: 'date', label: 'Fecha leída de una foto', hidden: true },
+        scannedFile: { kind: 'text', label: 'Foto leída', hidden: true },
         location: { kind: 'text', label: 'Dónde está el original' },
         files: { kind: 'files', label: 'Archivos' },
+        links: { kind: 'links', label: 'Enlaces' },
         notes: { kind: 'textarea', label: 'Notas' },
       },
       rules: [notBefore('issueDate', 'expiryDate', 'La caducidad no puede ser anterior a la expedición')],

@@ -26,6 +26,7 @@ const healthRecord = defineModule({
         active: { kind: 'boolean', label: 'Sigue activo' },
         notes: { kind: 'textarea', label: 'Notas' },
         files: { kind: 'files', label: 'Informes' },
+        links: { kind: 'links', label: 'Enlaces' },
       },
     }),
     defineRecordType({
@@ -113,6 +114,7 @@ const care = defineModule({
         reviewDate: { kind: 'date', label: 'Próxima revisión' },
         details: { kind: 'textarea', label: 'Detalles' },
         files: { kind: 'files', label: 'Archivos' },
+        links: { kind: 'links', label: 'Enlaces' },
       },
       agenda: [{ dateField: 'reviewDate', category: 'reminder', label: 'Revisar' }],
     }),

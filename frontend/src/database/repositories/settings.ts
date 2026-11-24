@@ -10,11 +10,13 @@ const shape = {
   motion: z.enum(['system', 'reduced']),
   building: z.enum(['3d', 'simple']),
   emergencyNumber: phone,
+  /** Permite enviar fotos de documentos al servidor del hogar. Apagado hasta que alguien lo active. */
+  photoReading: z.boolean(),
 }
 const settingsSchema = z.object(shape)
 export type Settings = z.infer<typeof settingsSchema>
 
-export const DEFAULT_SETTINGS: Settings = { textSize: 'normal', contrast: 'normal', motion: 'system', building: '3d', emergencyNumber: '112' }
+export const DEFAULT_SETTINGS: Settings = { textSize: 'normal', contrast: 'normal', motion: 'system', building: '3d', emergencyNumber: '112', photoReading: false }
 
 /** Al leer, cada preferencia dañada vuelve a su valor por defecto sin arrastrar a las demás. */
 const tolerantSchema = z.object({
@@ -23,6 +25,7 @@ const tolerantSchema = z.object({
   motion: shape.motion.catch(DEFAULT_SETTINGS.motion),
   building: shape.building.catch(DEFAULT_SETTINGS.building),
   emergencyNumber: phone.catch(DEFAULT_SETTINGS.emergencyNumber),
+  photoReading: shape.photoReading.catch(DEFAULT_SETTINGS.photoReading),
 }).catch(DEFAULT_SETTINGS)
 
 const KEY = 'preferences'

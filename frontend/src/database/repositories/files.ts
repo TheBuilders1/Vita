@@ -1,6 +1,7 @@
 import { ValidationError } from '@/services/errors'
 import { canRead } from '@/services/permissions'
 import { ACCEPTED_TYPES, MAX_FILE_BYTES, type StoredFile } from '@/types/records'
+import { resolveType } from '@/utils/fileType'
 import { newId } from '@/utils/ids'
 import { loadActor, type RepositoryContext } from './context'
 
@@ -9,18 +10,21 @@ const ABANDONED_MS = 24 * 60 * 60 * 1000
 export function createFileRepository(ctx: RepositoryContext) {
   const { db, now } = ctx
   return {
-    add: (actorId: string, file: File): Promise<StoredFile> =>
-      db.transaction('rw', db.members, db.files, async () => {
+    add: async (actorId: string, file: File): Promise<StoredFile> => {
+      // Fuera de la transacción: leer el archivo la cerraría.
+      const mime = await resolveType(file)
+      return db.transaction('rw', db.members, db.files, async () => {
         const actor = await loadActor(ctx, actorId)
-        if (!(ACCEPTED_TYPES as readonly string[]).includes(file.type)) throw new ValidationError({ files: 'Solo se admiten imágenes (JPG, PNG, WebP, GIF), PDF y texto' })
+        if (!(ACCEPTED_TYPES as readonly string[]).includes(mime)) throw new ValidationError({ files: 'Solo se admiten imágenes (JPG, PNG, WebP, GIF), PDF y texto' })
         if (file.size === 0) throw new ValidationError({ files: 'El archivo está vacío' })
         if (file.size > MAX_FILE_BYTES) throw new ValidationError({ files: `El archivo supera ${MAX_FILE_BYTES / 1024 / 1024} MB` })
         const stored: StoredFile = {
-          id: newId(), uploadedBy: actor.id, name: file.name, mime: file.type, size: file.size, blob: file, createdAt: now().toISOString(),
+          id: newId(), uploadedBy: actor.id, name: file.name, mime, size: file.size, blob: file.type === mime ? file : file.slice(0, file.size, mime), createdAt: now().toISOString(),
         }
         await db.files.add(stored)
         return stored
-      }),
+      })
+    },
 
     get: (actorId: string, id: string): Promise<StoredFile | undefined> =>
       db.transaction('r', db.members, db.records, db.files, async () => {

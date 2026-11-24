@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { useHome } from '@/app/providers/home'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -9,13 +9,17 @@ import { Panel } from '@/components/ui/Panel'
 import { repositories } from '@/database'
 import { WipeDialog } from '@/features/dashboard/WipeDialog'
 import { useTitle } from '@/hooks/useTitle'
+import { useToday } from '@/hooks/useToday'
 import type { ModuleId } from '@/modules/types'
 import { describeError } from '@/services/errors'
+import { suggestModules } from '@/services/onboarding'
+import { SERVER_HOUSEHOLD } from '@/services/homeServer'
 import { canManage } from '@/services/permissions'
 import { settingsStore, toastStore } from '@/store'
 import { BackupPanel } from './BackupPanel'
 import { ModulePicker } from './ModulePicker'
 import { PreferencesForm } from './PreferencesForm'
+import { ServerPanel } from './ServerPanel'
 import { StoragePanel } from './StoragePanel'
 
 function restoreTips() {
@@ -24,7 +28,9 @@ function restoreTips() {
 }
 
 export function SettingsPage() {
-  const { actor, family } = useHome()
+  const { actor, family, members } = useHome()
+  const today = useToday()
+  const reasons = useMemo(() => suggestModules({ members, hasPets: false }, today), [members, today])
   useTitle('Ajustes')
   // Estado propio: marcar dos casillas seguidas no puede esperar a la base de datos ni perder la primera.
   const [modules, setModules] = useState(family.enabledModules)
@@ -44,11 +50,12 @@ export function SettingsPage() {
         <div id="habitaciones" className="scroll-mt-4">
           <Panel title="Habitaciones abiertas">
             <p className="mb-5">Cerrar una habitación la oculta, pero no borra lo que hay dentro.</p>
-            <ModulePicker enabled={modules} onChange={changeModules} />
+            <ModulePicker reasons={reasons} enabled={modules} onChange={changeModules} />
           </Panel>
         </div>
       )}
       {canManage(actor, 'data') && <BackupPanel />}
+      {SERVER_HOUSEHOLD !== null && canManage(actor, 'data') && <ServerPanel />}
       <StoragePanel />
       <Panel title="Consejos">
         <p className="mb-3">Vuelve a enseñar los consejos que habías descartado.</p>

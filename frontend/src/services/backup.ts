@@ -5,7 +5,8 @@ import { ACCEPTED_TYPES, MAX_FILE_BYTES, type FamilyRecord } from '@/types/recor
 import { ConflictError } from './errors'
 import { filesOf, referencesOf, subjectsOf } from './integrity'
 
-export const BACKUP_VERSION = 1
+/** 2: los registros pueden llevar enlaces. Una Vita anterior debe decir que la copia es más nueva, no que está dañada. */
+export const BACKUP_VERSION = 2
 
 const id = z.string().regex(/^[\w-]{1,64}$/)
 const timestamp = z.iso.datetime()

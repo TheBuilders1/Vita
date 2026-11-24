@@ -25,6 +25,7 @@ export function RecordFormDialog({ type, record, preset, onClose }: RecordFormPr
   const form = useRef<HTMLFormElement>(null)
   const [failure, setFailure] = useState<string>()
   const [leaving, setLeaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [sharing, setSharing] = useState({ visibility: record?.visibility ?? type.visibility.default, sharedWith: record?.sharedWith ?? [], touched: false })
 
   // Quien solo puede anotar lo suyo no elige a otra persona.
@@ -37,6 +38,8 @@ export function RecordFormDialog({ type, record, preset, onClose }: RecordFormPr
   })
 
   const save = async (data: RecordData) => {
+    // Con Intro se puede enviar aunque el botón esté desactivado.
+    if (uploading) return
     setFailure(undefined)
     const { visibility, sharedWith } = sharing
     try {
@@ -49,7 +52,7 @@ export function RecordFormDialog({ type, record, preset, onClose }: RecordFormPr
     }
   }
   const focusFirstError = () => requestAnimationFrame(() => form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus())
-  const unsaved = isDirty || sharing.touched
+  const unsaved = isDirty || sharing.touched || uploading
   const requestClose = () => { if (unsaved) setLeaving(true); else onClose() }
 
   // Recargar o cerrar la pestaña también perdería lo escrito.
@@ -76,14 +79,14 @@ export function RecordFormDialog({ type, record, preset, onClose }: RecordFormPr
       ) : (
         <Fragment key="editing">
           <Button onClick={requestClose}>Cancelar</Button>
-          <Button type="submit" form="record-form" variant="primary" disabled={isSubmitting}>Guardar</Button>
+          <Button type="submit" form="record-form" variant="primary" disabled={isSubmitting || uploading}>{uploading ? 'Guardando archivos…' : 'Guardar'}</Button>
         </Fragment>
       )}
     >
       <form id="record-form" ref={form} noValidate onSubmit={(e) => { void handleSubmit(save, focusFirstError)(e) }} className="grid grid-cols-1 gap-5">
-        {Object.entries(type.fields).map(([name, field]) => (
+        {Object.entries(type.fields).filter(([, field]) => !field.hidden).map(([name, field]) => (
           <Controller key={name} control={control} name={name} render={({ field: { value, onChange, ref } }) => (
-            <FieldControl field={field} value={value} error={firstMessage(errors[name])} people={people} inputRef={ref} onChange={onChange} />
+            <FieldControl field={field} value={value} error={firstMessage(errors[name])} people={people} inputRef={ref} onChange={onChange} onBusy={setUploading} />
           )} />
         ))}
         {type.visibility.locked

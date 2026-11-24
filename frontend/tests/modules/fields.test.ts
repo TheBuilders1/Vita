@@ -119,3 +119,20 @@ test('las opciones múltiples solo admiten las declaradas y sin repetir', () => 
   expect(schema.parse({})).toEqual({ allergens: [] })
   expect(schema.safeParse({ allergens: ['nope'] }).success).toBe(false)
 })
+
+describe('enlaces', () => {
+  const schema = buildSchema({ links: { kind: 'links', label: 'Enlaces' } })
+  test('sin enlaces es una lista vacía, también en registros anteriores', () => expect(schema.parse({})).toEqual({ links: [] }))
+  test('se arreglan, sin huecos ni repetidos', () => {
+    expect(schema.parse({ links: [' www.dgt.es ', '', '  ', 'https://www.dgt.es', 'http://a.es'] })).toEqual({ links: ['https://www.dgt.es', 'http://a.es'] })
+  })
+  test('el mensaje dice cuál está mal', () => {
+    expect(messages(schema.safeParse({ links: ['https://a.es', 'hola'] }))).toEqual(['«hola» no es un enlace. Debe parecerse a www.ejemplo.es'])
+  })
+  test.each(['javascript:alert(1)', 'data:text/html,x', 'https://banco.es@estafa.com'])('rechaza %j', (link) => expect(schema.safeParse({ links: [link] }).success).toBe(false))
+  test('como mucho veinte', () => {
+    const many = (n: number) => Array.from({ length: n }, (_, i) => `https://a.es/${i}`)
+    expect(schema.safeParse({ links: many(20) }).success).toBe(true)
+    expect(schema.safeParse({ links: many(21) }).success).toBe(false)
+  })
+})

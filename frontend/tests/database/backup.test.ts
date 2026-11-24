@@ -66,6 +66,11 @@ describe('restaurar', () => {
     expect(await home.db.records.toArray()).toEqual(before)
     expect(await home.db.files.count()).toBe(1)
   })
+  test('una copia de la versión anterior, sin enlaces, se recupera', async () => {
+    await home.backup.restore(home.marta, await broken((d) => { d.version = 1; for (const r of d.records) delete r.data.links }))
+    const doc = (await home.db.records.toArray()).find((r) => r.typeId === 'document')!
+    expect(doc.data.links).toEqual([])
+  })
   test('los permisos derivados no se creen: se recalculan', async () => {
     await home.backup.restore(home.marta, await broken((d) => { const doc = d.records.find((r) => r.typeId === 'document')!; doc.subjectIds = [home.nora]; doc.moduleId = 'album' }))
     const doc = (await home.db.records.toArray()).find((r) => r.typeId === 'document')!

@@ -3,10 +3,13 @@ import { useEffect, useState } from 'react'
 import { useHome } from '@/app/providers/home'
 import { repositories } from '@/database'
 
-/** Archivo guardado y una dirección temporal para mostrarlo. La dirección se libera al desmontar. */
+/**
+ * Archivo guardado y una dirección temporal para mostrarlo. La dirección se libera al desmontar.
+ * `undefined` es que aún se está leyendo; `null`, que ya no está o este perfil no puede verlo.
+ */
 export function useFile(id: string) {
   const { actor } = useHome()
-  const file = useLiveQuery(() => repositories.files.get(actor.id, id), [actor.id, id])
+  const file = useLiveQuery(async () => (await repositories.files.get(actor.id, id)) ?? null, [actor.id, id])
   const [url, setUrl] = useState<string>()
   useEffect(() => {
     if (!file) return

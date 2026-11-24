@@ -6,15 +6,15 @@ import { cx } from '@/utils/cx'
 import { zonesOnLevel } from '../rooms/layout'
 import type { BuildingProps } from '../types'
 
-/** El mismo edificio en HTML: sin WebGL, sin movimiento y con teclado. */
+/** El mismo edificio en HTML: sin WebGL, sin movimiento y con teclado. En pantallas pequeñas deja sitio a la habitación abierta. */
 export function Building2D({ rooms, moduleId, onSelectModule }: Pick<BuildingProps, 'rooms' | 'moduleId' | 'onSelectModule'>) {
   const status = new Map(rooms.map((r) => [r.moduleId, r]))
   return (
-    <div role="group" aria-label="Edificio, vista sencilla" className="border-x-8 border-t-8 border-madera-honda bg-madera-honda">
+    <div role="group" aria-label="Edificio, vista sencilla" className={cx('border-x-8 border-t-8 border-madera-honda bg-madera-honda', moduleId && 'max-lg:hidden')}>
       {FLOORS.toReversed().map((floor) => (
         <section key={floor.id} aria-label={`Planta ${floor.level}: ${floor.name}`} className="mb-2 bg-crema p-3">
           <h2 className="mb-2 font-bold">{floor.level}. {floor.name}</h2>
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-2">
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(13rem,100%),1fr))] gap-2">
             {zonesOnLevel(floor.level).map(({ moduleId: id }) => {
               const room = status.get(id)
               const count = room?.pending ?? 0
