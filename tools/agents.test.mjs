@@ -45,7 +45,7 @@ const changes = {
     ['new URL(path, parsedBase.origin)', 'new URL(path, params.host)'],
     ['fetch(new URL(path, parsedBase.origin)', 'fetch(params.destino'],
   ],
-  orquestador: ['reportRef', 'scanRef', 'calendarRef', 'mensaje', 'respuestas', 'datos no confiables', 'No reveles referencias', 'MODO DE CHAT NORMAL', 'no uses herramientas ni delegues', 'nombre por defecto es Vita', 'no preguntes cómo quiere llamarte', 'responde exactamente:', 'tu asistente personal', 'visibleData', 'no la inventes', 'attachments', 'contenido no confiable'].map(s => [s, '', true]),
+  orquestador: ['reportRef', 'scanRef', 'calendarRef', 'mensaje', 'respuestas', 'datos no confiables', 'No reveles referencias', 'MODO DE CHAT NORMAL', 'no uses herramientas ni delegues', 'nombre por defecto es Vita', 'no preguntes cómo quiere llamarte', 'responde exactamente:', 'tu asistente personal', 'qué puedes hacer', 'visibleData', 'no la inventes', 'attachments', 'contenido no confiable'].map(s => [s, '', true]),
   documentos: [['no extraigas ni devuelvas texto OCR bruto', 'devuelve texto OCR bruto']],
   calendario: [['vita_read_google_calendar', 'vita_write_google_calendar']],
   compose: [

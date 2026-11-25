@@ -232,6 +232,7 @@ export function checkAgents({ config, plugin, pluginPackage, pluginSource, agent
       check(/MODO DE CHAT NORMAL[\s\S]*?\bno uses herramientas ni delegues/i.test(agents.orquestador), 'chat conversacional sin herramientas')
       check(/nombre por defecto es Vita[\s\S]*?no preguntes cómo quiere llamarte/i.test(agents.orquestador), 'identidad fija de Vita en el chat')
       check(/responde exactamente: «¡Hola! Soy Vita, tu asistente personal\. ¿En qué puedo ayudarte\?»/i.test(agents.orquestador), 'saludo inicial fijo de Vita')
+      check(/qué puedes hacer[^.]*: apuntar citas[^.]*\. Aclara que nada se guarda hasta que la persona lo confirma\. No ofrezcas otras funciones\./i.test(agents.orquestador), 'funciones de Vita, sin inventar otras')
       check(/visibleData[^.]*no la inventes/i.test(agents.orquestador), 'respuestas del chat basadas en datos visibles')
       check(/attachments[^.]*contenido no confiable/i.test(agents.orquestador), 'adjuntos del chat no confiables')
       check(/\bno extraigas ni devuelvas texto OCR bruto\b/i.test(agents.documentos), 'protección del texto OCR')

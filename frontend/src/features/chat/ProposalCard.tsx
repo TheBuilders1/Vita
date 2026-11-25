@@ -30,7 +30,9 @@ export function ProposalCard({ proposal, status, onStatus }: { proposal: Proposa
   const draft: FamilyRecord = { id: 'propuesta', typeId: type.id, moduleId: type.moduleId, ownerId: actor.id, subjectIds: [], visibility: type.visibility.default, sharedWith: [], data: proposal.data, createdAt: '', updatedAt: '' }
   const rows = Object.entries(type.fields).flatMap(([name, field]) => {
     const value = proposal.data[name]
-    if (value === undefined || value === false || (Array.isArray(value) && value.length === 0)) return []
+    if (value === undefined || value === false || field.hidden || (Array.isArray(value) && value.length === 0)) return []
+    // Los adjuntos se ven en la ficha; aquí basta con saber que van.
+    if (field.kind === 'files' && Array.isArray(value)) return [{ name, label: field.label, text: value.length === 1 ? '1 archivo adjunto' : `${value.length} archivos adjuntos` }]
     const text = fieldText(draft, name, context)
     return [{ name, label: field.label, text: field.kind === 'date' ? `${WEEKDAYS[weekdayOf(String(value)) - 1]}, ${text}` : text }]
   })

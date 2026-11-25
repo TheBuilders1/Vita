@@ -4,7 +4,7 @@ import type { AssistantDetails } from '@/store/chatStore'
 import { askOrchestrator, assistantContext, shouldUseAssistant } from './assistant'
 import { answer, type ChatContext, type Reply } from './index'
 
-export const proposalType = z.enum(['task', 'event', 'appointment', 'dentalVisit', 'shoppingItem', 'shoppingList'])
+export const proposalType = z.enum(['task', 'event', 'appointment', 'dentalVisit', 'shoppingItem', 'shoppingList', 'transaction', 'document'])
 interface Result { reply: Reply; details?: AssistantDetails; remote: boolean }
 interface Remote { readonly connected: boolean; readonly household: string | null; readonly conversationId: string; readonly attachments?: readonly File[]; readonly signal: AbortSignal }
 

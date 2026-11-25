@@ -12,7 +12,9 @@ Está pensado para una demo local del hackathon, ejecutada desde `curl` o, de fo
 - Chat conversacional para mensajes generales; cada usuario y conversación tienen una sesión de OpenClaw aislada.
 - Adjuntos efímeros en el chat: OCR local de imágenes JPG/PNG/WebP y PDF escaneados, y extracción local de PDF, TXT y DOCX.
 - Conexión OAuth individual a Google Calendar, refresh token cifrado y consultas de solo lectura delegadas a un subagente especializado.
-- Carga privada de imágenes JPEG/PNG con límites de tamaño, dimensiones y decodificación.
+- Carga privada de documentos JPEG/PNG o PDF con límites de tamaño, dimensiones, páginas y decodificación. PostgreSQL guarda el nombre del archivo; el archivo va al volumen privado (`VITA_STORAGE_DIR`).
+- Borrado de un documento con su lectura, su aviso y su archivo; limpieza de archivos huérfanos al arrancar.
+- Copia y restauración de la base y los archivos en un solo `.tar.gz` comprobado con SHA-256.
 - OCR local con Tesseract; se extrae únicamente una fecha vinculada a una etiqueta de caducidad.
 - Confirmación o corrección explícita de la fecha antes de crear un recordatorio persistido en PostgreSQL.
 - Pruebas unitarias para validación, OCR, cliente OpenClaw, esquemas y cálculo horario.
@@ -148,10 +150,10 @@ Las rutas de usuario usan `Authorization: Bearer <token>`. El cliente no puede e
 | `GET /healthz` | Comprueba la conexión a PostgreSQL; no requiere autenticación. |
 | `POST /v1/chat` | Responde a un mensaje de conversación general con el orquestador; no consulta los datos del hogar. |
 | `POST /v1/chat/attachments` | Extrae texto localmente de una imagen JPG/PNG/WebP, PDF, TXT o DOCX; no guarda el archivo. |
-| `POST /v1/chat/attachments` | Extrae texto localmente de una imagen, PDF, TXT o DOCX; no guarda el archivo. |
 | `POST /v1/runs` | Crea una ejecución y devuelve `202` con `runId`; admite `documentId` opcional. |
 | `GET /v1/runs/{run_id}` | Consulta estado y resultado; solo el usuario creador. |
-| `POST /v1/documents` | Carga una imagen JPEG/PNG como multipart (`householdId` y `file`). |
+| `POST /v1/documents` | Carga una imagen JPEG/PNG o un PDF de hasta 20 páginas como multipart (`householdId` y `file`). |
+| `DELETE /v1/documents/{document_id}` | Borra el documento, sus ejecuciones, su recordatorio y su archivo; solo quien lo subió. `409 document_in_use` si se está leyendo. |
 | `POST /v1/runs/{run_id}/confirm` | Confirma o corrige la fecha y persiste un recordatorio. |
 | `POST /v1/calendar/connect` | Inicia OAuth de solo lectura para el usuario autenticado. |
 | `GET /v1/calendar/status` | Informa si el usuario autenticado conectó su cuenta. |
@@ -277,6 +279,38 @@ curl -i http://127.0.0.1:8000/v1/runs/RUN_ID/confirm \
 La respuesta incluye `reminderId` y `scheduledAt`. El aviso se calcula para las 09:00 de la zona horaria del hogar (`Europe/Madrid` en los hogares de demo), 30 días naturales antes por defecto. Si la hora calculada ya pasó, la API rechaza la confirmación. Repetir la misma confirmación devuelve el recordatorio existente; cambiar la fecha o el plazo para esa ejecución devuelve `409`.
 
 **El recordatorio queda guardado, no enviado.** Este proyecto no incluye un worker de notificaciones.
+
+### PDF y borrado
+
+Un PDF se acepta si empieza por `%PDF-`, Poppler lo abre, no está cifrado y tiene 20 páginas o menos. Al escanearlo se usa su texto y, si es un PDF escaneado sin texto, se pasa por Tesseract página a página, igual que los adjuntos del chat. PostgreSQL guarda `mime_type = 'application/pdf'` sin ancho ni alto.
+
+```bash
+curl -i -X DELETE http://127.0.0.1:8000/v1/documents/DOCUMENT_ID \
+  -H 'Authorization: Bearer alba-demo-token-change-me'
+```
+
+El archivo se borra después de confirmar la transacción. Si no se pudiera, queda huérfano: al arrancar, la API borra los archivos del volumen que no tienen fila en `producto.documents` y tienen más de una hora (antes podrían ser una subida en curso).
+
+## Copias de seguridad
+
+La base y los archivos van juntos: una copia solo de PostgreSQL perdería las imágenes, y una solo del volumen perdería a qué documento pertenecen. `python -m app.backup` guarda las tablas de `gestion` y `producto` con `COPY`, los archivos del volumen y un `manifest.json` con las migraciones aplicadas y la huella SHA-256 de cada parte. Necesita `MIGRATION_DATABASE_URL`.
+
+Con `docker compose`, crear una copia (puede hacerse con la API en marcha: la base se lee en una sola instantánea):
+
+```bash
+umask 077
+docker compose exec -T api python -m app.backup create - > vita-copia.tar.gz
+```
+
+Restaurar sustituye la base y los archivos actuales. Para la API antes, para que nadie escriba a la vez:
+
+```bash
+docker compose stop api
+docker compose run --rm -T --no-deps api python -m app.backup restore - --yes < vita-copia.tar.gz
+docker compose start api
+```
+
+Antes de tocar nada se comprueba que la copia solo contiene lo esperado (sin rutas fuera del volumen), que cada huella coincide y que las migraciones son las mismas que las de la base. Las tablas se cargan en una sola transacción. La copia contiene documentos de identidad y el refresh token cifrado de Google Calendar: guárdala con permisos `600`, fuera del repositorio. Sin `GOOGLE_TOKEN_ENCRYPTION_KEY`, ese token no sirve.
 
 ## Seguridad y privacidad de la demo
 

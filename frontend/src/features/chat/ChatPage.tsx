@@ -14,6 +14,9 @@ import { accessTo } from '@/services/permissions'
 import { respond, followUps } from '@/services/chat/connected'
 import { CHAT_ATTACHMENT_ACCEPT, MAX_MESSAGE, todaySummary, validateChatAttachments, type Reply } from '@/services/chat'
 import { formatBytes } from '@/utils/format'
+import { preparePhoto } from '@/utils/photo'
+import { repositories } from '@/database'
+import { proposeFromFiles, savingIntent, understandFile } from '@/services/chat/understand'
 import { newId } from '@/utils/ids'
 import { ListenButton } from '@/components/ui/ListenButton'
 import { joinDictation } from '@/services/dictation'
@@ -122,7 +125,7 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
   // Al abrir el panel se ve lo último de la conversación, junto a donde se escribe.
   useEffect(() => { if (panel) composer.current?.scrollIntoView({ block: 'end' }) }, [panel])
 
-  // Los adjuntos los lee el servidor del hogar: solo se ofrecen con él y con el permiso de Ajustes.
+  // Leer un archivo por dentro necesita el servidor del hogar y el permiso de Ajustes. Pegarlo o adjuntarlo, no.
   const canAttach = connectedChat && SERVER_HOUSEHOLD !== null
   const addAttachments = (incoming: readonly File[]) => {
     const error = validateChatAttachments([...attachments.map(({ file }) => file), ...incoming])
@@ -130,11 +133,12 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
     if (!error) setAttachments((current) => [...current, ...incoming.map((file) => ({ id: newId(), file }))])
   }
   const say = async (message: string, previous?: Reply) => {
+    const files = attachments.map(({ file }) => file)
+    if (files.length && !request.current && (savingIntent(message) || !canAttach)) { void keep(files, message.trim()); return }
     const written = message.trim() || (attachments.length > 0 ? 'Ayúdame a entender lo que adjunto.' : '')
     if (!written || request.current) { input.current?.focus(); return }
     chatStore.getState().enter(actor.id)
     const { conversationId } = chatStore.getState()
-    const files = attachments.map(({ file }) => file)
     const shown = files.length ? `${written}\n\nAdjuntos: ${files.map((f) => f.name || 'imagen').join(', ')}` : written
     const controller = new AbortController()
     const result = respond(written, {
@@ -160,6 +164,35 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
     request.current = null
     setPending('')
   }
+  /** Guardar lo pegado o adjuntado: Vita lo lee y propone la ficha rellena para confirmarla. */
+  const keep = async (files: File[], written: string) => {
+    chatStore.getState().enter(actor.id)
+    const { conversationId } = chatStore.getState()
+    const shown = `${written || 'Guarda esto'}\n\nAdjuntos: ${files.map((f) => f.name || 'imagen').join(', ')}`
+    const controller = new AbortController()
+    request.current = controller
+    requestedScroll.current = true
+    setText('')
+    setAttachments([])
+    setAttachmentError(undefined)
+    setPending(shown)
+    let reply: Reply
+    try {
+      reply = await proposeFromFiles(files, written, {
+        store: async (file) => (await repositories.files.add(actor.id, await preparePhoto(file))).id,
+        read: canAttach ? (file, hint, signal) => understandFile(file, hint, { signal }) : undefined,
+        members, actorId: actor.id, today, signal: controller.signal,
+      })
+    } catch (cause) {
+      reply = { kind: 'text', text: describeError(cause) }
+    }
+    request.current = null
+    setPending('')
+    const current = chatStore.getState()
+    if (controller.signal.aborted || current.actorId !== actor.id || current.conversationId !== conversationId) return
+    current.add(shown, reply)
+    input.current?.focus({ preventScroll: true })
+  }
   const clear = () => {
     const undo = restartConversation(chatStore)
     toastStore.getState().show(RESTARTED, 'success', { label: 'Deshacer', run: undo })
@@ -184,7 +217,7 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
             {place && <p className="text-apagado">Hablas con Vita desde {place}.</p>}
           </div>
         </header>
-        {connectedChat && SERVER_HOUSEHOLD && <p className="chat-connection">Vita conectada está activa. Si necesito ayuda, consultaré tu mensaje con el servidor del hogar. Evita incluir datos privados.</p>}
+        {connectedChat && SERVER_HOUSEHOLD && <p className="chat-connection">Hablas con el asistente del servidor de tu hogar. Lo que apuntes se guarda solo en este dispositivo y cuando lo confirmes. Evita escribir datos privados que no hagan falta.</p>}
         {empty && <button type="button" className="chat-talk pixel-edge" onClick={talk}><Mic aria-hidden="true" />{voice.listening ? 'Te escucho…' : 'Pulsa y habla'}<span>o escribe abajo, como prefieras</span></button>}
         {empty && <div className="chat-starters">{STARTERS.map(({ label, icon: Icon, example, editable }) => (
           <button type="button" key={label} className="chat-starter pixel-edge" onClick={() => {
@@ -210,8 +243,9 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
       </div>
       <form ref={composer} onSubmit={(e: FormEvent) => { e.preventDefault(); void say(text) }} className={`chat-composer ${empty ? '' : 'chat-composer-sticky'}`}
         onPaste={(e) => {
-          if (!canAttach) return
-          const pasted = [...e.clipboardData.files]
+          // Una captura de pantalla llega como «item», no siempre como archivo.
+          const pasted = e.clipboardData.files.length ? [...e.clipboardData.files]
+            : [...e.clipboardData.items].flatMap((item) => (item.kind === 'file' ? [item.getAsFile()] : [])).filter((f): f is File => f !== null)
           if (pasted.length > 0) { e.preventDefault(); addAttachments(pasted) }
         }}>
         {resetToast?.action && <div role="status" className="chat-reset">{RESTARTED} <button type="button" onClick={() => { resetToast.action?.run(); toastStore.getState().dismiss(resetToast.id) }}>Deshacer</button></div>}
@@ -233,12 +267,12 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
         <div className="chat-controls">
           <p><Check aria-hidden="true" />Nada se guarda sin que lo confirmes</p>
           <button type="button" className="chat-attach" onClick={() => setUploading(true)}><FileUp aria-hidden="true" />Subir documento</button>
-          {canAttach && <button type="button" className="chat-attach" disabled={!!pending} onClick={() => fileInput.current?.click()}><Paperclip aria-hidden="true" />Preguntar por un archivo</button>}
+          <button type="button" className="chat-attach" disabled={!!pending} onClick={() => fileInput.current?.click()}><Paperclip aria-hidden="true" />Adjuntar archivo</button>
           {speech.speaking && <Button size="sm" icon={Square} onClick={speech.stop}>Callar a Vita</Button>}
         </div>
         {noVoice && <p role="status">Este navegador no puede escuchar. Prueba con Chrome, Edge o Safari, o escríbelo: Vita lo entiende igual.</p>}
         {attachments.length > 0 && (
-          <ul aria-label="Archivos para preguntar" className="grid grid-cols-1 gap-2">
+          <ul aria-label="Archivos adjuntos" className="grid grid-cols-1 gap-2">
             {attachments.map(({ id, file }) => (
               <li key={id} className="flex min-h-11 items-center gap-2 bg-yeso p-2">
                 <Paperclip aria-hidden="true" className="size-5 shrink-0" />
@@ -250,10 +284,12 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
             ))}
           </ul>
         )}
-        {canAttach && <p className="text-apagado">El archivo se lee en el servidor del hogar y al asistente solo le llega el texto. No se guarda en Vita: para guardarlo, usa «Subir documento».</p>}
+        {attachments.length > 0 && <p className="text-apagado">{canAttach
+          ? 'Envíalo sin escribir nada y Vita lo leerá para proponerte la ficha. Si escribes una pregunta, te contesta sobre el archivo. Se lee en el servidor de tu hogar.'
+          : 'Envíalo y Vita lo guardará en este dispositivo. Para leerlo por dentro hace falta el servidor del hogar.'}</p>}
         <p role="alert" className="empty:hidden">{attachmentError}</p>
-        {canAttach && <input ref={fileInput} type="file" accept={CHAT_ATTACHMENT_ACCEPT} multiple hidden aria-label="Elegir archivos para preguntar"
-          onChange={(e) => { addAttachments(Array.from(e.currentTarget.files ?? [])); e.currentTarget.value = '' }} />}
+        <input ref={fileInput} type="file" accept={CHAT_ATTACHMENT_ACCEPT} multiple hidden aria-label="Elegir archivos para adjuntar"
+          onChange={(e) => { addAttachments(Array.from(e.currentTarget.files ?? [])); e.currentTarget.value = '' }} />
         <UploadDialog open={uploading} onClose={() => setUploading(false)} />
         <output className="empty:hidden">{voice.listening && 'Te escucho. Habla con calma.'}</output>
         {voice.listening && dictation !== 'device' && <p className="text-base text-apagado">Tu navegador convierte la voz en texto con su servicio (por ejemplo, Google o Apple). Puedes cambiarlo en Ajustes.</p>}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 import warnings
 from dataclasses import dataclass
 from io import BytesIO
@@ -18,9 +19,49 @@ class ImageRejected(ValueError):
 class ImageMetadata:
     mime_type: str
     extension: str
-    width: int
-    height: int
+    width: int | None
+    height: int | None
     byte_size: int
+
+
+MAX_PDF_PAGES = 20
+
+
+def inspect_document(
+    data: bytes,
+    content_type: str | None,
+    max_bytes: int,
+    max_dimension: int,
+    max_pixels: int,
+) -> ImageMetadata:
+    """Una foto (JPG o PNG) o un PDF. Del PDF se comprueba que Poppler lo abre entero."""
+    if content_type != "application/pdf":
+        return inspect_image(data, content_type, max_bytes, max_dimension, max_pixels)
+    if not data:
+        raise ImageRejected("empty_image")
+    if len(data) > max_bytes:
+        raise ImageRejected("image_too_large", 413)
+    if not data.startswith(b"%PDF-"):
+        raise ImageRejected("invalid_document")
+    try:
+        result = subprocess.run(
+            ["pdfinfo", "-"], input=data, capture_output=True, timeout=10, check=False
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+        raise ImageRejected("document_reader_unavailable", 503) from exc
+    info = dict(
+        line.split(":", 1)
+        for line in result.stdout.decode("utf-8", errors="replace").splitlines()
+        if ":" in line
+    )
+    pages = info.get("Pages", "").strip()
+    if result.returncode != 0 or not pages.isdigit() or int(pages) == 0:
+        raise ImageRejected("invalid_document")
+    if info.get("Encrypted", "no").strip().startswith("yes"):
+        raise ImageRejected("encrypted_document")
+    if int(pages) > MAX_PDF_PAGES:
+        raise ImageRejected("too_many_pages", 413)
+    return ImageMetadata("application/pdf", "pdf", None, None, len(data))
 
 
 def inspect_image(

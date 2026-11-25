@@ -12,7 +12,13 @@ CHAT_SYSTEM_PROMPT = (
     "no preguntes cómo quiere llamarte la persona ni sugieras cambiarlo. No "
     "inicies rituales de identidad, avatar o configuración. Si la persona saluda "
     "al inicio de la conversación, responde exactamente: «¡Hola! Soy Vita, tu "
-    "asistente personal. ¿En qué puedo ayudarte?». En cualquier otro mensaje, "
+    "asistente personal. ¿En qué puedo ayudarte?». Si después pregunta qué "
+    "puedes hacer o no sabe por dónde empezar, explícale en pocas frases lo que "
+    "hace Vita: apuntar citas, tareas que se repiten y la compra; consultar la "
+    "agenda, el gasto del mes y los datos de las fichas del hogar; leer documentos "
+    "para proponer su caducidad; y dar los teléfonos de emergencia. Aclara que "
+    "nada se guarda hasta que la persona lo confirma. No ofrezcas otras funciones. "
+    "En cualquier otro mensaje, "
     "responde directamente, sin un saludo protocolario. Responde con naturalidad, "
     "de forma útil y breve, en español salvo que la persona use otro idioma. Este "
     "turno es una conversación, no una ejecución: no uses herramientas "
@@ -81,6 +87,18 @@ class OpenClawClient:
         except ValueError as exc:
             raise GatewayError("gateway_error") from exc
 
+    def understand(self, request_key: str, hint: str, text: str) -> str:
+        """Pide al modelo los datos de un documento. Cada lectura tiene su propia sesión: no se acumulan."""
+        from app.understand import UNDERSTAND_SYSTEM_PROMPT, understanding_payload
+
+        return self._complete(
+            request_key,
+            [
+                {"role": "system", "content": UNDERSTAND_SYSTEM_PROMPT},
+                {"role": "user", "content": understanding_payload(hint, text)},
+            ],
+        )
+
     def chat(
         self,
         conversation_key: str,
@@ -88,6 +106,28 @@ class OpenClawClient:
         visible_data: list[dict[str, str]],
         attachments: list[str],
     ) -> str:
+        return self._complete(
+            conversation_key,
+            [
+                {"role": "system", "content": CHAT_SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "question": message,
+                            "visibleData": visible_data,
+                            "attachments": [
+                                {"name": f"Adjunto {index + 1}", "text": text}
+                                for index, text in enumerate(attachments)
+                            ],
+                        },
+                        ensure_ascii=False,
+                    ),
+                },
+            ],
+        )
+
+    def _complete(self, user: str, messages: list[dict[str, str]]) -> str:
         if not self.settings.openclaw_token:
             raise GatewayError("gateway_not_configured")
 
@@ -106,27 +146,11 @@ class OpenClawClient:
                     },
                     json={
                         "model": f"openclaw/{self.settings.openclaw_agent_id}",
-                        "user": conversation_key,
+                        "user": user,
                         "stream": False,
                         "max_completion_tokens": 1024,
                         "tool_choice": "none",
-                        "messages": [
-                            {"role": "system", "content": CHAT_SYSTEM_PROMPT},
-                            {
-                                "role": "user",
-                                "content": json.dumps(
-                                    {
-                                        "question": message,
-                                        "visibleData": visible_data,
-                                        "attachments": [
-                                            {"name": f"Adjunto {index + 1}", "text": text}
-                                            for index, text in enumerate(attachments)
-                                        ],
-                                    },
-                                    ensure_ascii=False,
-                                ),
-                            },
-                        ],
+                        "messages": messages,
                     },
                 )
         except httpx.TimeoutException as exc:

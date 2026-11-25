@@ -69,3 +69,7 @@ test('el dictado está apagado hasta que alguien lo activa, también con prefere
   await db.settings.put({ key: 'preferences', value: { textSize: 'large', dictation: true } })
   expect(await repo.load()).toMatchObject({ textSize: 'large', dictation: 'off' })
 })
+
+test('con servidor del hogar, el chat va al orquestador salvo que se desactive en Ajustes', () => {
+  expect(DEFAULT_SETTINGS.connectedChat).toBe(true)
+})
