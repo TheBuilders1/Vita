@@ -7,6 +7,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import UUID
 
+from cryptography.fernet import Fernet
+
 
 def _demo_tokens(value: str) -> dict[str, UUID]:
     if not value:
@@ -42,10 +44,25 @@ class Settings:
     openclaw_token: str = ""
     openclaw_agent_id: str = "orquestador"
     openclaw_timeout_seconds: int = 120
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    google_oauth_redirect_uri: str = ""
+    google_token_encryption_key: str = ""
     max_upload_bytes: int = 10 * 1024 * 1024
     max_image_dimension: int = 8000
     max_image_pixels: int = 20_000_000
     demo_tokens: dict[str, UUID] = field(default_factory=dict)
+
+    @property
+    def google_calendar_enabled(self) -> bool:
+        return all(
+            (
+                self.google_oauth_client_id,
+                self.google_oauth_client_secret,
+                self.google_oauth_redirect_uri,
+                self.google_token_encryption_key,
+            )
+        )
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -76,6 +93,44 @@ class Settings:
         ):
             raise ValueError("OPENCLAW_BASE_URL debe ser una URL HTTP(S) sin credenciales")
 
+        google_client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
+        google_client_secret = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
+        google_redirect_uri = os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "")
+        google_token_key = os.getenv("GOOGLE_TOKEN_ENCRYPTION_KEY", "")
+        google_calendar_values = (
+            google_client_id,
+            google_client_secret,
+            google_redirect_uri,
+            google_token_key,
+        )
+        if any(google_calendar_values) and not all(google_calendar_values):
+            raise ValueError("La configuración OAuth de Google debe estar completa")
+        if all(google_calendar_values):
+            parsed_redirect_uri = urlsplit(google_redirect_uri)
+            if (
+                parsed_redirect_uri.scheme not in {"http", "https"}
+                or not parsed_redirect_uri.netloc
+                or parsed_redirect_uri.username is not None
+                or parsed_redirect_uri.password is not None
+                or parsed_redirect_uri.query
+                or parsed_redirect_uri.fragment
+            ):
+                raise ValueError("GOOGLE_OAUTH_REDIRECT_URI debe ser una URL HTTP(S) válida")
+            if parsed_redirect_uri.scheme == "http" and parsed_redirect_uri.hostname not in {
+                "localhost",
+                "127.0.0.1",
+                "::1",
+            }:
+                raise ValueError(
+                    "GOOGLE_OAUTH_REDIRECT_URI debe usar HTTPS fuera de localhost"
+                )
+            try:
+                Fernet(google_token_key.encode("ascii"))
+            except (ValueError, UnicodeEncodeError) as exc:
+                raise ValueError(
+                    "GOOGLE_TOKEN_ENCRYPTION_KEY debe ser una clave Fernet válida"
+                ) from exc
+
         return cls(
             database_url=os.getenv(
                 "DATABASE_URL",
@@ -87,6 +142,10 @@ class Settings:
             openclaw_token=os.getenv("OPENCLAW_TOKEN", ""),
             openclaw_agent_id=agent_id,
             openclaw_timeout_seconds=timeout,
+            google_oauth_client_id=google_client_id,
+            google_oauth_client_secret=google_client_secret,
+            google_oauth_redirect_uri=google_redirect_uri,
+            google_token_encryption_key=google_token_key,
             max_upload_bytes=max_upload,
             max_image_dimension=max_dimension,
             max_image_pixels=max_pixels,

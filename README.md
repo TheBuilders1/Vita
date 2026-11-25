@@ -8,6 +8,8 @@
 
 Comidas, colegio, salud, cuentas y planes: cada cosa en su habitación, en tu propio dispositivo.
 
+Vita también incluye un backend local y opcional para demostraciones: delega tareas a subagentes de OpenClaw, consulta Google Calendar en modo de solo lectura mediante OAuth y analiza imágenes ficticias con OCR local. Calendar solo consulta el calendario principal, con autorización explícita y un rango de hasta 31 días; no crea ni modifica eventos. **No uses documentos reales ni publiques la API o el Gateway de OpenClaw.**
+
 [![Despliegue](https://github.com/TheBuilders1/Vita/actions/workflows/deploy.yml/badge.svg?branch=development)](https://github.com/TheBuilders1/Vita/actions/workflows/deploy.yml)
 ![React 19](https://img.shields.io/badge/React-19-24344d)
 ![TypeScript 7](https://img.shields.io/badge/TypeScript-7-24344d)
@@ -79,6 +81,8 @@ pnpm dev
 
 La web funciona sola. El backend es opcional y se arranca aparte: ver [docs/backend.md](docs/backend.md).
 
+El backend de demostración añade autenticación local, ejecución asíncrona con resultados validados, OAuth individual para Calendar con refresh tokens cifrados y OCR privado de imágenes ficticias. La persona confirma cualquier fecha antes de que se guarde un recordatorio. Consulta [docs/backend.md](docs/backend.md) para configuración, seguridad y ejemplos.
+
 ## Arquitectura
 
 ```mermaid
@@ -91,21 +95,22 @@ flowchart LR
   subgraph demo["Demo local, opcional y privada"]
     api["FastAPI<br/>autentica, valida y escribe"] --> pg[("PostgreSQL")]
     api --> ocr["Tesseract local"]
-    api <--> claw["OpenClaw<br/>orquestador → documentos"]
+    api <--> claw["OpenClaw<br/>orquestador → documentos / calendario"]
+    api --> gcal["Google Calendar<br/>(OAuth, solo lectura)"]
   end
   ui -. "solo con pnpm dev" .-> api
 ```
 
 - **Frontend** ([`frontend/`](frontend/)): guarda todo en el navegador. Cada módulo se declara una vez y de ahí salen validación, formularios, listados y agenda.
-- **Backend** ([`app/`](app/)): demo local que lee la caducidad de un documento a partir de su foto. Delega en agentes, pero la API es la única que decide y escribe.
-- **Agentes** ([`openclaw/`](openclaw/)): interpretan y delegan. No tienen acceso a la base de datos, a las imágenes ni a internet.
+- **Backend** ([`app/`](app/)): demo local para OCR y consultas de Google Calendar de solo lectura. Delega en agentes, pero la API es la única que autoriza, valida y escribe.
+- **Agentes** ([`openclaw/`](openclaw/)): el orquestador usa GLM 5.2 y los subagentes usan MiniMax M3, mediante Ollama Cloud. No tienen acceso directo a la base de datos ni a las imágenes, ni herramientas de navegación web.
 
 | Capa | Tecnología |
 | --- | --- |
 | Interfaz | React 19, TypeScript 7, Tailwind 4, React Router 8 |
 | Edificio 3D | Three.js y React Three Fiber, con geometría y texturas propias |
 | Datos en el navegador | Dexie (IndexedDB), Zod, Web Crypto |
-| Backend | FastAPI, PostgreSQL 16, Tesseract, OpenClaw |
+| Backend | FastAPI, PostgreSQL 16, Tesseract, OpenClaw, Google Calendar API |
 | Pruebas | Vitest, Playwright, axe, pytest |
 
 ## Seguridad y privacidad
@@ -152,7 +157,8 @@ Se trabaja sobre `development`. Los mensajes de commit siguen [Conventional Comm
 app/  migrations/  database/   backend y base de datos
 openclaw/                      agentes y su plugin
 frontend/                      aplicación web
-tests/backend/                 pruebas del backend
+tests/                         pruebas del backend
+frontend/tests/                pruebas del frontend
 tools/                         guardianes del repositorio y servidor de pruebas
 .github/                       despliegue y plantillas
 docs/                          documentación
