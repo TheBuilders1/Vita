@@ -4,10 +4,11 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { useStore } from 'zustand'
 import { NotFoundPage } from '@/app/NotFoundPage'
 import { useHome } from '@/app/providers/home'
-import { FloorDirectory, floorButtonId, roomButtonId } from '@/components/navigation/FloorDirectory'
+import { FloorDirectory, floorButtonId, nextFloor, roomButtonId } from '@/components/navigation/FloorDirectory'
 import { LiftBar } from '@/components/navigation/LiftBar'
 import { CountBadge } from '@/components/ui/Badge'
 import { QuickActions } from '@/features/dashboard/QuickActions'
+import { CheckIn } from '@/features/dashboard/CheckIn'
 import { StartCard } from '@/features/dashboard/StartCard'
 import { SummaryPanel } from '@/features/dashboard/SummaryPanel'
 import { useAttention } from '@/hooks/useAttention'
@@ -29,7 +30,7 @@ const ROOMS = MODULES.filter((m) => m.floor !== null)
 export function BuildingPage() {
   const params = useParams()
   const navigate = useNavigate()
-  const { family, actor } = useHome()
+  const { family, actor, members } = useHome()
   const attention = useAttention()
   const [hovered, setHovered] = useState<ModuleId | null>(null)
   const bigText = useStore(settingsStore, (s) => s.settings.textSize !== 'normal')
@@ -78,9 +79,12 @@ export function BuildingPage() {
   if (missing) return <NotFoundPage />
 
   // Cambiar de planta no es cambiar de pantalla: sin esto, la página saltaría arriba y lo pulsado quedaría fuera de la vista.
-  const selectFloor = (id: FloorId) => { void navigate(`/planta/${id}`, { preventScrollReset: true }) }
+  const selectFloor = (id: FloorId) => {
+    const target = nextFloor(module ? null : floor?.id ?? null, id)
+    if (!target) setTab('floors')
+    void navigate(target ? `/planta/${target}` : '/edificio', { preventScrollReset: true })
+  }
   const chooseFloor = (id: FloorId) => {
-    // Pulsar la planta ya abierta no cambia nada: la marca se quedaría puesta para la siguiente navegación.
     fromList.current = module !== null || floor?.id !== id
     selectFloor(id)
   }
@@ -116,6 +120,7 @@ export function BuildingPage() {
       <div className="relative lg:min-h-0 lg:overflow-y-auto lg:pr-1">
         {module && floor ? <ModulePanel module={module} floor={floor} enabled={rooms.some((r) => r.moduleId === module.id && r.enabled)} /> : (
           <>
+            {members.length === 1 && <CheckIn />}
             <StartCard />
             <QuickActions />
             <div className="mb-3 flex gap-1">

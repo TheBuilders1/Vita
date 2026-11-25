@@ -1,10 +1,10 @@
 import { canRead } from '@/services/permissions'
 import { moduleLink } from '@/utils/links'
 import { budget, completion, help, search } from './actions'
-import { ages, agenda, allergies, expiry, medication, phones, shoppingPending } from './consult'
+import { todaySummary as summary, ages, agenda, allergies, expiry, intakes, kidMoney, medication, pantry, pets, phones, shoppingPending, wifi } from './consult'
 import { propose } from './propose'
 import type { ChatContext, Reply } from './types'
-import { cut, findRepeat, phrase } from './when'
+import { cut, findDate, findRepeat, phrase } from './when'
 
 export { reviewReply, UNAVAILABLE } from './visibility'
 export {
@@ -39,11 +39,11 @@ const SEARCH = /^(?:busca(?:r|me)?|encuentra(?:me)?)\b\s*/
 const SPENDING = /^cuanto (?:llevamos|llevo|hemos gastado|he gastado)(?: gastad[oa]s?)?(?: en |[?!]?$)/
 const GUIDE = /^(?:como (?:puedo )?|ayuda (?:con|para) )/
 const PHOTO = /\b(escane\w*|lee(?:r|me)? (?:la |una |esta )?(?:foto|caducidad|documento)|foto (?:del|de un|de mi) (?:documento|dni))/
-const AGENDA = /^(?:que|cuales)\b.*\b(?:tengo|tenemos|tienes?|hay|toca|pendientes?|planes|eventos|citas)\b|^(?:mi )?(?:agenda|calendario)\b|^planes\b|^(?:tengo|tenemos|hay) (?:algo|planes|citas?)\b/
+const AGENDA = /^(?:que|cuales)\b.*\b(?:tengo|tenemos|tienes?|hay|toca|pendientes?|planes|eventos|citas)\b|^(?:mi )?(?:agenda|calendario)\b|^(?:mis? )?(?:planes|citas|tareas|eventos)\b|^(?:tengo|tenemos|hay) (?:algo|planes|citas?)\b/
 const HELP = /^(?:hola|buen[oa]s\b|ayuda|que (?:puedes|sabes) hacer|quien eres|como funciona)/
 
-const HELP_TEXT = 'Hola. ¿En qué te puedo ayudar?'
-const UNKNOWN = 'Cuéntame un poco más y trataré de ayudarte.'
+const HELP_TEXT = 'Entiendo frases sencillas. Puedo apuntar citas, tareas que se repiten y compra. También puedo buscar, revisar la agenda y el gasto del mes, decirte qué hay en la nevera, la clave de la wifi, el veterinario o lo que tiene ahorrado cada hijo, y marcar una tarea o una toma como hecha. Nada se guarda hasta que tú lo confirmas.'
+export const UNKNOWN = 'No te he entendido. Prueba con «apunta dentista para el martes a las 10», «compra leche y pan» o «qué tengo esta semana».'
 
 function emergency({ records, emergencyNumber }: ChatContext, selfHarm: boolean): Reply {
   const contacts = records.filter((r) => r.typeId === 'emergencyContact')
@@ -55,8 +55,13 @@ function emergency({ records, emergencyNumber }: ChatContext, selfHarm: boolean)
 }
 
 /** Contesta con reglas, en este dispositivo. Propone cambios para que la persona los confirme. */
+/** Solo lo que el perfil puede ver y las habitaciones abiertas. */
+const readable = (supplied: ChatContext): ChatContext => ({ ...supplied, records: supplied.records.filter((r) => supplied.enabled.includes(r.moduleId) && canRead(supplied.actor, r)) })
+
+export const todaySummary = (supplied: ChatContext) => summary(readable(supplied))
+
 export function answer(message: string, supplied: ChatContext): Reply {
-  const context = { ...supplied, records: supplied.records.filter((r) => supplied.enabled.includes(r.moduleId) && canRead(supplied.actor, r)) }
+  const context = readable(supplied)
   const full = phrase(message.slice(0, MAX_MESSAGE))
   const text = cut(full, 0, POLITE.exec(full.plain)?.[0].length ?? 0)
   const said = text.plain
@@ -92,11 +97,22 @@ export function answer(message: string, supplied: ChatContext): Reply {
   const guide = GUIDE.exec(said)
   if (guide && !HELP.test(said)) return help(said.slice(guide[0].length))
   if (/\b(?:caduc|vence|vencen|expira)\w*|\brenov/.test(said)) return expiry(said, context)
+  if (/^(?:ya )?(?:me )?(?:he|ha) tomado\b|\bya (?:me )?la he tomado\b/.test(said)) return intakes(context)
+  if (/\bwifi\b|\bwi fi\b|\bclave de (?:la )?red\b/.test(said)) return wifi(context)
+  if (/\b(?:nevera|frigo|congelador|despensa)\b|\bque hay (?:en casa )?(?:para comer|de comer)\b/.test(said)) return pantry(said, context)
+  if (/\bveterinari/.test(said)) return pets(said, context)
+  if (/\bcuanto (?:dinero )?(?:tiene|ha ahorrado|lleva ahorrado)\b|\bpaga de\b|\bhucha\b/.test(said)) return kidMoney(said, context)
   if (/\balerg|\bintoleran/.test(said)) return allergies(said, context)
   if (/\bmedicacion|\bmedicament|\bpastilla|\bque toma\b/.test(said)) return medication(said, context)
   if (/\bcuantos años\b|\bque edad\b|\bedad de\b|\bcumpleaños de\b|\bcuando (?:nacio|cumple)\b|\bcuando es (?:el|mi) cumple/.test(said)) return ages(said, context)
   if (/\btelefono|\bnumero de\b|\bllamar a\b/.test(said)) return phones(said, context)
   if (/\bcompra\b|\bcomprar\b/.test(said)) return shoppingPending(context)
+  if (!question && context.origin === 'calendar' && /^(?:dentista|cita|pediatra)\b/.test(said)) return propose(text, context, true)
+  if (context.previous?.kind === 'agenda' && /^y la semana que viene[?!]*$/.test(said)) return agenda(said, context, context.previous.scope)
+  const date = findDate(text, context.today)
+  if (date.value && /^y?\s*[?!.]*$/.test(date.text.plain)) {
+    return agenda(`mi agenda ${said}`, context, context.previous?.kind === 'agenda' ? context.previous.scope : undefined)
+  }
   if (AGENDA.test(said)) return agenda(said, context)
    if (HELP.test(full.plain) || /^(?:que (?:puedes|sabes) hacer)/.test(said)) return { kind: 'assistant', text: HELP_TEXT }
    if (/^(?:muchas )?gracias/.test(said)) return { kind: 'text', text: 'De nada.' }

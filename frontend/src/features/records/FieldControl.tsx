@@ -34,7 +34,7 @@ export function FieldControl({ field, value, error, people, inputRef, member, on
   const person = people.map((m) => ({ value: m.id, label: m.name }))
 
   switch (field.kind) {
-    case 'text': return <TextInput {...text} autoComplete="off" maxLength={field.maxLength ?? 200} />
+    case 'text': return <TextInput {...text} type={field.secret ? 'password' : 'text'} autoComplete={field.secret ? 'new-password' : 'off'} maxLength={field.maxLength ?? 200} />
     case 'textarea': return <TextArea {...text} rows={3} />
     case 'date': return <TextInput {...text} type="date" />
     case 'time': return <TextInput {...text} type="time" />

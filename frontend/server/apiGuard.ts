@@ -9,7 +9,7 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 interface Call { readonly method: string | undefined; readonly url: string | undefined; readonly remote: string | undefined; readonly guard: string | undefined; readonly site: string | undefined }
 
 /**
- * Solo las seis llamadas que hacen falta y solo desde este equipo. La cabecera propia obliga al navegador
+ * Solo las llamadas que hacen falta y solo desde este equipo. La cabecera propia obliga al navegador
  * a pedir permiso antes: sin ella, otra web abierta podría usar el token sin saberlo nadie.
  */
 export function isAllowedCall({ method, url, remote, guard, site }: Call): boolean {

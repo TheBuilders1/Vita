@@ -17,7 +17,7 @@ async function settled(sheet: HTMLElement | null): Promise<void> {
 }
 
 /** Monta la hoja fuera de la aplicación, espera a sus imágenes e imprime. Al cerrar la ventana de impresión avisa con `onDone`. */
-export function PrintSheet({ children, onDone }: { children: ReactNode; onDone: () => void }) {
+export function PrintSheet({ children, onDone, footer }: { children: ReactNode; onDone: () => void; footer?: ReactNode }) {
   const sheet = useRef<HTMLDivElement>(null)
   const done = useEffectEvent(onDone)
   useEffect(() => {
@@ -33,7 +33,7 @@ export function PrintSheet({ children, onDone }: { children: ReactNode; onDone: 
   return createPortal(
     <div ref={sheet} className="print-sheet">
       {children}
-      <p>Impreso desde Vita el {formatDate(todayIso())}.</p>
+      {footer ?? <p>Impreso desde Vita el {formatDate(todayIso())}.</p>}
     </div>,
     document.body,
   )

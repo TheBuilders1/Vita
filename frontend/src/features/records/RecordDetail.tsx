@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog'
 import { PrintSheet } from '@/components/print/PrintSheet'
 import { ListenButton } from '@/components/ui/ListenButton'
+import { CookingMode } from '@/features/modules/CookingMode'
 import { Disclaimer } from '@/components/ui/Notice'
 import { repositories } from '@/database'
 import type { RemovalSummary } from '@/database/repositories/removal'
@@ -110,6 +111,7 @@ export function RecordDetail({ record, onClose, onEdit, onDuplicate }: RecordDet
       <div className="mb-5 flex flex-wrap gap-2">
         <Button size="sm" icon={Share2} onClick={() => setSharing(true)}>Compartir</Button>
         <ListenButton text={() => shareText(record, context)} />
+        {record.typeId === 'recipe' && <CookingMode recipe={record} />}
         <Button size="sm" icon={Printer} onClick={() => setPrinting(true)}>Imprimir</Button>
         {canDuplicate(actor, record) && <Button size="sm" icon={CopyPlus} disabled={copying} onClick={() => { void attempt(duplicate()) }}>{copying ? 'Copiando…' : 'Duplicar'}</Button>}
       </div>

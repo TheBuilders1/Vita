@@ -10,7 +10,7 @@ import { applyRemoval, summarize, type RemovalSummary } from './removal'
 import { forgetInTrash } from './trash'
 
 /** Lo que cada persona puede cambiar de su propio perfil sin ser admin. */
-const SELF_EDITABLE = new Set<string>(['name', 'birthDate', 'relationship', 'photo'])
+const SELF_EDITABLE = new Set<string>(['name', 'birthDate', 'relationship', 'photo', 'notes', 'phone'])
 const NEEDS_MASTER = 'El hogar necesita al menos un admin'
 
 const parseFamily = (input: FamilyInput) => {

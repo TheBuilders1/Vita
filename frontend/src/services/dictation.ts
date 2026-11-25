@@ -8,9 +8,9 @@ export function dictationProblem(code: string): string | undefined {
     case 'aborted': return undefined
     case 'not-allowed': case 'service-not-allowed': return 'El navegador no deja usar el micrófono. Puedes permitirlo en el icono que hay junto a la dirección.'
     case 'audio-capture': return 'No se encuentra ningún micrófono.'
-    case 'network': return 'El dictado de este navegador necesita conexión a internet y ahora no la hay.'
+    case 'network': return 'Para usar la voz, este navegador necesita conexión a internet y ahora no la hay.'
     case 'no-speech': return 'No se ha oído nada. Prueba otra vez, más cerca del micrófono.'
-    case 'language-not-supported': return 'Este navegador no sabe dictar en español.'
-    default: return 'No se ha podido dictar. Escríbelo o prueba otra vez.'
+    case 'language-not-supported': return 'Este navegador no reconoce la voz en español.'
+    default: return 'No se ha podido reconocer la voz. Escríbelo o prueba otra vez.'
   }
 }

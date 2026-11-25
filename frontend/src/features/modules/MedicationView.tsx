@@ -9,6 +9,8 @@ import { buildAgenda, type AgendaItem } from '@/services/agenda'
 import { completionFor } from '@/services/completion'
 import { describeError } from '@/services/errors'
 import { toastStore } from '@/store'
+import { ListenButton } from '@/components/ui/ListenButton'
+import { spokenAgenda } from '@/services/speech'
 import { Block, ModuleRecords } from './shared'
 
 export function MedicationView() {
@@ -22,6 +24,7 @@ export function MedicationView() {
   return (
     <div className="grid grid-cols-1 gap-6">
       <Block title="Tomas de hoy">
+        {doses.length > 0 && <div className="mb-3"><ListenButton size="lg" label="Escuchar las tomas de hoy" text={() => spokenAgenda('Hoy', doses)} /></div>}
         {people.length === 0 ? <EmptyState title="Hoy no hay tomas previstas" /> : people.map((m) => (
           <div key={m.id} className="mb-4">
             <h4 className="mb-1 font-bold">{m.name}</h4>

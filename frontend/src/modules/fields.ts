@@ -21,7 +21,7 @@ interface SimpleField extends FieldBase {
     | 'date' | 'time' | 'money' | 'boolean' | 'tags' | 'times' | 'weekdays'
     | 'member' | 'members' | 'files' | 'ingredients' | 'phone' | 'url' | 'links'
 }
-interface TextField extends FieldBase { readonly kind: 'text' | 'textarea'; readonly maxLength?: number }
+interface TextField extends FieldBase { readonly kind: 'text' | 'textarea'; readonly maxLength?: number; readonly secret?: boolean }
 interface NumberField extends FieldBase { readonly kind: 'number' | 'integer'; readonly min?: number; readonly max?: number; readonly unit?: string }
 interface SelectField extends FieldBase { readonly kind: 'select' | 'choices'; readonly options: readonly Option[] }
 interface RecordField extends FieldBase { readonly kind: 'record'; readonly refType: string }
@@ -93,7 +93,7 @@ const optionValues = (field: SelectField) => field.options.map((o) => o.value) a
 
 function scalarSchema(field: Field): z.ZodType {
   switch (field.kind) {
-    case 'text': return text(field.maxLength ?? TEXT_MAX)
+    case 'text': return field.secret ? z.string().max(field.maxLength ?? TEXT_MAX) : text(field.maxLength ?? TEXT_MAX)
     case 'textarea': return text(field.maxLength ?? TEXTAREA_MAX)
     case 'date': return dateSchema
     case 'time': return timeSchema
@@ -128,6 +128,7 @@ function fieldSchema(field: Field): z.ZodType {
     return z.preprocess((v) => v ?? [], present)
   }
   const scalar = scalarSchema(field)
+  if (field.kind === 'text' && field.secret && !field.required) return z.preprocess((v) => v === '' || v === null ? undefined : v, scalar.optional())
   if (!field.required) return z.preprocess(blankToUndefined, scalar.optional())
   return z.preprocess(blankToUndefined, z.any().refine((v) => v !== undefined, { error: REQUIRED_MESSAGE, abort: true }).pipe(scalar))
 }

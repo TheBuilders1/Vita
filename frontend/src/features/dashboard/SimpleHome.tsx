@@ -5,6 +5,7 @@ import { useStore } from 'zustand'
 import { useHome } from '@/app/providers/home'
 import { ButtonLink } from '@/components/ui/Button'
 import { ListenButton } from '@/components/ui/ListenButton'
+import { CheckIn } from './CheckIn'
 import { AgendaRow } from '@/features/calendar/AgendaRow'
 import { useAttention } from '@/hooks/useAttention'
 import { useTitle } from '@/hooks/useTitle'
@@ -15,11 +16,12 @@ import { settingsStore } from '@/store'
 import { formatDay } from '@/utils/format'
 import { telLink } from '@/utils/links'
 
-/** Portada del perfil vulnerable: lo suyo de hoy, a quién llamar y poco más. */
+/** Portada de la vista sencilla: lo suyo de hoy, a quién llamar y poco más. */
 export function SimpleHome() {
   const { actor, records } = useHome()
   const today = useToday()
   const attention = useAttention()
+  const extraNumbers = useStore(settingsStore, (s) => s.settings.emergencyContacts)
   const emergencyNumber = useStore(settingsStore, (s) => s.settings.emergencyNumber)
   useTitle('Inicio')
 
@@ -36,6 +38,7 @@ export function SimpleHome() {
         <p className="mt-1 text-2xl">{formatDay(today)}</p>
         <div className="mt-3"><ListenButton size="lg" label="Escuchar lo de hoy" text={() => spokenAgenda('Hoy', on('today'))} /></div>
       </header>
+      <CheckIn />
       <Section title="Hoy" items={on('today')} empty="Hoy no tienes nada pendiente." />
       <Section title="Mañana" items={on('tomorrow')} />
       <section aria-labelledby="call-title">
@@ -43,6 +46,7 @@ export function SimpleHome() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {contacts.map((c) => <CallLink key={c.id} name={String(c.data.name)} phone={String(c.data.phone)} />)}
           <CallLink name="Emergencias" phone={emergencyNumber} danger />
+          {extraNumbers.map((c, index) => <CallLink key={index} name={c.name} phone={c.number} />)}
         </div>
       </section>
       <div className="flex flex-wrap gap-3">
@@ -71,9 +75,9 @@ function Section({ title, items, empty }: { title: string; items: readonly Agend
 
 function CallLink({ name, phone, danger = false }: { name: string; phone: string; danger?: boolean }) {
   return (
-    <a href={telLink(phone)} className={`pixel-edge flex min-h-20 items-center gap-4 px-5 py-3 text-xl font-bold ${danger ? 'bg-peligro text-crema [--edge:var(--color-peligro-hondo)]' : 'bg-crema'}`}>
+    <a href={telLink(phone)} className={`pixel-edge flex min-h-20 items-center gap-4 px-5 py-3 text-xl font-bold ${danger ? 'sm:col-span-2 bg-peligro text-crema [--edge:var(--color-peligro-hondo)]' : 'bg-crema'}`}>
       <Phone aria-hidden="true" className="size-8 shrink-0" />
-      <span className="leading-tight">{name}<span className="block font-normal tabular-nums">{phone}</span></span>
+      <span className="min-w-0 leading-tight [overflow-wrap:anywhere]">{name}<span className="block font-normal tabular-nums">{phone}</span></span>
     </a>
   )
 }

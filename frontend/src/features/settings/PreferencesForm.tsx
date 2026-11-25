@@ -5,7 +5,7 @@ import { describeError } from '@/services/errors'
 import { settingsStore, toastStore } from '@/store'
 
 const change = (changes: Partial<Settings>) => {
-  settingsStore.getState().update(changes).catch((error: unknown) => toastStore.getState().show(describeError(error), 'error'))
+  settingsStore.getState().update(changes).then(() => toastStore.getState().show('Preferencia guardada')).catch((error: unknown) => toastStore.getState().show(describeError(error), 'error'))
 }
 
 /** Se aplica y se guarda al momento: no hace falta un botón de guardar. */

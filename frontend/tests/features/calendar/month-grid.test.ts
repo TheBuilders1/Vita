@@ -17,3 +17,9 @@ test('un mes de seis semanas deja un solo día en el orden de tabulación', () =
   expect(selected).toContain('aria-pressed="true"')
   expect(selected).toContain('Martes, 24 de noviembre. 1 cosa')
 })
+
+test('el día anuncia también las categorías de los apuntes de rutina', () => {
+  const dose: AgendaItem = { ...item, key: 'toma', category: 'medication', routine: true }
+  const html = renderToStaticMarkup(createElement(MonthGrid, { weeks: [[day]], day, today: day, items: [item, dose], onSelect: () => {} }))
+  expect(html).toContain('Martes, 24 de noviembre. 2 cosas. Eventos, Medicación')
+})

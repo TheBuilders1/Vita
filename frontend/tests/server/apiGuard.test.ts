@@ -29,3 +29,10 @@ test('sin token u hogar no hay conexión', () => {
 })
 test.each(['http://api.ejemplo.com', 'http://192.168.1.5:8000', 'nada', 'file:///x', 'http://127.0.0.1.malo.com'])('no manda el token a %s', (url) => expect(readApiConfig({ ...env, VITA_API_URL: url })).toBeNull())
 test.each(['http://localhost:9000', 'http://127.0.0.1:9000', 'http://[::1]:9000', 'https://api.ejemplo.com'])('%s vale: es este equipo o va cifrado', (url) => expect(readApiConfig({ ...env, VITA_API_URL: url })?.target).toBe(url))
+
+test('el chat exige la ruta exacta, el método y la misma protección del proxy', () => {
+  const chat = { url: '/api/v1/chat' }
+  for (const extra of [{ site: 'cross-site' }, { guard: undefined }, { method: 'GET' }, { remote: '192.168.1.2' }, { url: '/api/v1/chat?x=1' }]) {
+    expect(call({ ...chat, ...extra })).toBe(false)
+  }
+})

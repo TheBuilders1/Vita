@@ -10,7 +10,10 @@ import type { Field, RecordData } from '@/modules/fields'
 import { getModule } from '@/modules/registry'
 import type { RecordTypeDef } from '@/modules/types'
 import { addableTypes, missingParent } from '@/services/adding'
-import { accessTo } from '@/services/permissions'
+import { repositories } from '@/database'
+import { describeError } from '@/services/errors'
+import { toastStore } from '@/store'
+import { accessTo, canUpdate } from '@/services/permissions'
 import { byRelevance } from '@/services/sorting'
 import { fieldText, recordTitle, titleContext, type TitleContext } from '@/services/titles'
 import type { FamilyRecord } from '@/types/records'
@@ -64,22 +67,37 @@ export function RecordList({ type, records: given, preset }: RecordListProps) {
 }
 
 function RecordRow({ record, type, context }: { record: FamilyRecord; type: RecordTypeDef; context: TitleContext }) {
+  const { actor } = useHome()
+  const editable = canUpdate(actor, record)
   const { forRecord } = useCompletion()
   const editor = useRecordEditor()
   const done = type.doneField ? Boolean(record.data[type.doneField]) : undefined
   const title = recordTitle(record, context)
+  const cancel = async () => {
+    if (!window.confirm(`¿Quieres cancelar el plan «${title}»?`)) return
+    const show = toastStore.getState().show
+    const fail = (error: unknown) => show(describeError(error), 'error')
+    try {
+      const saved = await repositories.records.update(actor.id, record.id, { ifUnchanged: record.updatedAt, data: { ...record.data, status: 'cancelled' } })
+      show('Plan cancelado', 'success', { label: 'Deshacer', run: () => {
+        repositories.records.update(actor.id, record.id, { data: record.data, ifUnchanged: saved.updatedAt }).catch(fail)
+      } })
+    } catch (error) { fail(error) }
+  }
   const toggle = done === undefined ? undefined : forRecord(record, title, done)
   return (
-    <li className="flex items-center gap-2 border-b-2 border-beige">
+    <li className="flex flex-wrap items-center gap-2 border-b-2 border-beige">
       {done !== undefined && (
         <button type="button" aria-pressed={done} disabled={!toggle} onClick={toggle} aria-label={`Hecho: ${title}`} className="grid size-11 shrink-0 place-items-center focus-visible:outline-offset-[-3px] disabled:opacity-50">
           <span className={`grid size-7 place-items-center border-2 ${done ? 'border-oliva bg-oliva text-crema' : 'border-borde bg-crema'}`}>{done && <Check aria-hidden="true" className="size-5" />}</span>
         </button>
       )}
-      <button type="button" onClick={() => editor.open(record.id)} className="min-h-14 min-w-0 flex-1 py-2 text-left leading-snug hover:bg-yeso focus-visible:outline-offset-[-3px]">
+      <button type="button" onClick={() => editor.open(record.id)} className="min-h-14 min-w-0 basis-36 grow break-words py-2 text-left leading-snug hover:bg-yeso focus-visible:outline-offset-[-3px]">
         <span className={`block font-bold underline-offset-4 hover:underline ${done ? 'line-through' : ''}`}>{title}</span>
-        <span className="block text-apagado">{summary(type, record, context)}</span>
+        <span className="block text-apagado">{record.data.status === 'cancelled' && 'Cancelado · '}{summary(type, record, context)}</span>
       </button>
+      {editable && <Button size="sm" onClick={() => editor.edit(record.id)}>Cambiar<span className="sr-only"> {title}</span></Button>}
+      {editable && type.id === 'outing' && record.data.status !== 'cancelled' && <Button size="sm" onClick={() => void cancel()}>Cancelar plan</Button>}
     </li>
   )
 }
@@ -90,7 +108,7 @@ const SKIP: ReadonlySet<Field['kind']> = new Set(['textarea', 'files', 'links', 
 function summary(type: RecordTypeDef, record: FamilyRecord, context: TitleContext): string {
   const title = recordTitle(record, context)
   return Object.entries(type.fields)
-    .filter(([name, f]) => name !== type.titleField && !f.hidden && !SKIP.has(f.kind))
+    .filter(([name, f]) => !(f.kind === 'text' && f.secret) && !(name === 'status' && record.data.status === 'cancelled') && name !== type.titleField && !f.hidden && !SKIP.has(f.kind))
     .map(([name]) => fieldText(record, name, context))
     .filter((text) => text && !title.includes(text))
     .slice(0, 4)

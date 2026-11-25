@@ -1,6 +1,7 @@
 import { CircleCheck, TriangleAlert } from 'lucide-react'
 import { useHome } from '@/app/providers/home'
 import { useRecordEditor } from '@/features/records/editor'
+import { CookingMode } from './CookingMode'
 import type { RecipeMatch } from '@/services/recipes'
 
 export function RecipeCard({ match: { recipe, missing, conflicts } }: { match: RecipeMatch }) {
@@ -19,6 +20,7 @@ export function RecipeCard({ match: { recipe, missing, conflicts } }: { match: R
       {missing.length === 0
         ? <p className="mt-1 flex items-center gap-2"><CircleCheck aria-hidden="true" className="size-5 text-oliva" />Tenéis todo lo necesario</p>
         : <p className="mt-1">Falta: {missing.join(', ').toLowerCase()}</p>}
+      <div className="mt-3"><CookingMode recipe={recipe} /></div>
     </li>
   )
 }

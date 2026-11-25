@@ -1,193 +1,282 @@
-import { Mic, Paperclip, Send, Square, Trash2, X } from 'lucide-react'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { CalendarDays, Check, FileUp, Mic, Paperclip, NotebookPen, Phone, RotateCcw, Search, Send, Square, X } from 'lucide-react'
+import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router'
 import { useStore } from 'zustand'
 import { useHome, type Home } from '@/app/providers/home'
-import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
-import { FieldError, TextInput } from '@/components/ui/Field'
+import { LogoMark } from '@/components/layout/Logo'
 import { canDictate, useDictation } from '@/hooks/useDictation'
 import { useTitle } from '@/hooks/useTitle'
 import { useToday } from '@/hooks/useToday'
-import { answer, askOrchestrator, assistantContext, CHAT_ATTACHMENT_ACCEPT, MAX_MESSAGE, shouldUseAssistant, validateChatAttachments } from '@/services/chat'
-import { joinDictation } from '@/services/dictation'
-import { describeError } from '@/services/errors'
-import { SERVER_HOUSEHOLD } from '@/services/homeServer'
-import { chatStore, settingsStore } from '@/store'
+import { MODULES } from '@/modules/registry'
+import type { ModuleId } from '@/modules/types'
+import { accessTo } from '@/services/permissions'
+import { respond, followUps } from '@/services/chat/connected'
+import { CHAT_ATTACHMENT_ACCEPT, MAX_MESSAGE, todaySummary, validateChatAttachments, type Reply } from '@/services/chat'
 import { formatBytes } from '@/utils/format'
 import { newId } from '@/utils/ids'
-import { isHiddenBelow } from '@/utils/reveal'
+import { ListenButton } from '@/components/ui/ListenButton'
+import { joinDictation } from '@/services/dictation'
+import { describeError } from '@/services/errors'
+import { useSpeech } from '@/hooks/useSpeech'
+import type { Settings } from '@/database/repositories/settings'
+import { SERVER_HOUSEHOLD } from '@/services/homeServer'
+import { chatStore, settingsStore, toastStore } from '@/store'
+import { greeting, restartConversation, scrollDistance } from './conversation'
+import { UploadDialog } from '@/features/dashboard/UploadDialog'
 import { ReplyView } from './ReplyView'
 
 const SUGGESTIONS = ['¿Qué tengo esta semana?', 'Busca el DNI', '¿Cuánto llevamos en comida?', 'Recuérdame regar las plantas cada lunes a las 9']
-const FORM_BUTTON = 'max-w-full [overflow-wrap:anywhere] max-[24rem]:px-3'
+const ROOM_IDEAS: Partial<Record<ModuleId, string>> = {
+  dental: 'Anótame dentista el martes a las 10', healthRecord: 'Mis citas de esta semana',
+  diet: '¿Qué alergias tengo?', medication: 'Mi medicación', documents: '¿Cuándo caduca mi DNI?',
+  shopping: '¿Qué falta en la compra?', finances: '¿Cuánto llevamos en comida?',
+  emergency: 'Teléfonos de emergencia', planner: 'Recuérdame regar las plantas mañana',
+}
+const STARTERS = [
+  { label: 'Apuntar algo', icon: NotebookPen, example: 'Apunta dentista el martes a las 10', editable: true },
+  { label: '¿Qué tengo hoy?', icon: CalendarDays, example: '¿Qué tengo hoy?' },
+  { label: 'Buscar un dato', icon: Search, example: 'Busca el DNI', editable: true },
+  { label: 'Teléfonos de emergencia', icon: Phone, example: 'Teléfonos de emergencia' },
+]
+const RESTARTED = 'Has empezado una conversación nueva.'
 type ChatAttachment = { readonly id: string; readonly file: File }
 
-/** Los encargos y consultas del hogar se resuelven localmente; solo el chat abierto usa el orquestador. */
 export function ChatPage() {
+  useTitle('Pídeselo a Vita')
   const home = useHome()
   return <ProfileChat key={home.actor.id} home={home} />
 }
 
-function ProfileChat({ home: { actor, members, records, family } }: { home: Home }) {
+export function ProfileChat({ home: { actor, members, records, family }, panel = false, fromRoom }: { home: Home; panel?: boolean; fromRoom?: string }) {
   const today = useToday()
-  const { emergencyNumber, photoReading, dictation } = useStore(settingsStore, (s) => s.settings)
+  const [params, setParams] = useSearchParams()
+  const from = panel ? fromRoom : params.get('desde')
+  const room = MODULES.find((m) => m.id === from && family.enabledModules.includes(m.id) && accessTo(actor, m.id) !== 'none')
+  const origin = from === 'calendar' ? from : room?.id
+  const place = room?.name ?? (origin === 'calendar' ? 'Calendario' : '')
+  const suggestions = room ? [ROOM_IDEAS[room.id] ?? `Busca ${room.name}`, '¿Qué tengo esta semana?']
+    : origin === 'calendar' ? ['¿Qué tengo hoy?', '¿Qué tengo mañana?', 'Anótame dentista el martes a las 10'] : SUGGESTIONS
+  const requestedVoice = !panel && params.get('hablar') === '1'
+  const [showExample, setShowExample] = useState(requestedVoice)
+  const { emergencyNumber, photoReading, dictation, connectedChat } = useStore(settingsStore, (s) => s.settings)
   const turns = useStore(chatStore, (s) => (s.actorId === actor.id ? s.turns : NONE))
   const [text, setText] = useState('')
-  const [thinking, setThinking] = useState(false)
+  const [hour] = useState(() => new Date().getHours())
+  // Se añade a lo escrito y espera: se puede corregir antes de enviar.
+  // Si se le ha hablado, Vita contesta también en voz alta. Si se escribe, calla.
+  const spokenTurn = useRef(false)
+  const voice = useDictation((spoken) => { spokenTurn.current = true; setText((written) => joinDictation(written, spoken, MAX_MESSAGE)); input.current?.focus({ preventScroll: true }) })
+  const speech = useSpeech()
+  const [askVoice, setAskVoice] = useState(false)
+  const listen = (mode: Settings['dictation']) => {
+    setAskVoice(false)
+    if (mode === 'off') return
+    void voice.start(mode === 'any')
+  }
+  const [noVoice, setNoVoice] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
   const [attachmentError, setAttachmentError] = useState<string>()
-  const thinkingRef = useRef(false)
-  // Se añade a lo escrito y espera: se puede corregir antes de enviar.
-  const voice = useDictation((spoken) => { setText((written) => joinDictation(written, spoken, MAX_MESSAGE)); input.current?.focus({ preventScroll: true }) })
-  const form = useRef<HTMLFormElement>(null)
-  const input = useRef<HTMLInputElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
-  const latest = useRef<HTMLLIElement>(null)
-  useTitle('Pídeselo a Vita')
-  useEffect(() => { chatStore.getState().enter(actor.id) }, [actor.id])
-  // La respuesta se lee desde el principio: nadie debe confirmar algo que no ve. Si no cabe junto a lo de escribir, el foco va a ella.
-  useEffect(() => {
-    const turn = latest.current
-    if (!turn || !form.current) return
-    turn.scrollIntoView({ block: 'start' })
-    const inset = Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingBottom)
-    if (isHiddenBelow(form.current.getBoundingClientRect().bottom, window.innerHeight, inset)) turn.focus({ preventScroll: true })
-  }, [turns.length])
-
-  const addAttachments = (incoming: readonly File[]) => {
-    if (SERVER_HOUSEHOLD === null) {
-      setAttachmentError('Los adjuntos requieren el servidor local de Vita.')
-      return
-    }
-    const files = [...attachments.map(({ file }) => file), ...incoming]
-    const error = validateChatAttachments(files)
-    if (error) { setAttachmentError(error); return }
-    setAttachments((current) => [...current, ...incoming.map((file) => ({ id: newId(), file }))])
-    setAttachmentError(undefined)
+  const talk = () => {
+    if (!canDictate()) { setNoVoice(true); return }
+    if (voice.listening) voice.stop()
+    else if (dictation === 'off') setAskVoice(!askVoice)
+    else listen(dictation)
   }
+  const chooseVoice = (mode: 'device' | 'any') => {
+    settingsStore.getState().update({ dictation: mode })
+      .then(() => { toastStore.getState().show(mode === 'device' ? 'Voz activada en este dispositivo' : 'Voz activada'); listen(mode) })
+      .catch((cause: unknown) => toastStore.getState().show(describeError(cause), 'error'))
+  }
+  const [pending, setPending] = useState('')
+  const request = useRef<AbortController>(null)
+  const input = useRef<HTMLTextAreaElement>(null)
+  const latest = useRef<HTMLDivElement>(null)
+  const history = useRef<HTMLDivElement>(null)
+  const composer = useRef<HTMLFormElement>(null)
+  const requestedScroll = useRef(false)
+  const resetToast = useStore(toastStore, state => panel ? state.toasts.find(t => t.message === RESTARTED) : undefined)
+  useEffect(() => () => request.current?.abort(), [])
+  const openMicrophone = useEffectEvent(() => {
+    setShowExample(true)
+    setParams((current) => { current.delete('hablar'); return current }, { replace: true, preventScrollReset: true })
+    input.current?.focus()
+    if (dictation !== 'off' && canDictate()) void voice.start(dictation === 'any')
+  })
+  useEffect(() => {
+    if (!requestedVoice) return
+    const frame = requestAnimationFrame(() => openMicrophone())
+    return () => cancelAnimationFrame(frame)
+  }, [requestedVoice])
+  useEffect(() => {
+    if (showExample && voice.problem) input.current?.focus()
+  }, [showExample, voice.problem])
+  const latestId = turns.at(-1)?.id
+  useEffect(() => {
+    if (!latest.current || !history.current || !composer.current || (!panel && !requestedScroll.current)) return
+    // En el panel se desplaza el cuerpo del diálogo, no la página.
+    const scroller = panel ? history.current.parentElement?.closest<HTMLElement>('.overflow-y-auto') : undefined
+    const bounds = (scroller ?? history.current).getBoundingClientRect()
+    const { top, bottom } = latest.current.getBoundingClientRect()
+    const distance = scrollDistance(top, bottom, panel ? bounds.top : 8, composer.current.getBoundingClientRect().top - 8)
+    if (distance) {
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.dataset.motion === 'reduced'
+      const target = scroller ?? window
+      target.scrollBy({ top: distance, behavior: reduced || !requestedScroll.current ? 'instant' : 'smooth' })
+    }
+  }, [latestId, pending, panel])
+  // Al abrir el panel se ve lo último de la conversación, junto a donde se escribe.
+  useEffect(() => { if (panel) composer.current?.scrollIntoView({ block: 'end' }) }, [panel])
 
-  const say = async (message: string) => {
-    const clean = message.trim() || (attachments.length > 0 ? 'Ayúdame a entender el contenido adjunto.' : '')
-    if (!clean) { input.current?.focus(); return }
-    if (thinkingRef.current) return
+  // Los adjuntos los lee el servidor del hogar: solo se ofrecen con él y con el permiso de Ajustes.
+  const canAttach = connectedChat && SERVER_HOUSEHOLD !== null
+  const addAttachments = (incoming: readonly File[]) => {
+    const error = validateChatAttachments([...attachments.map(({ file }) => file), ...incoming])
+    setAttachmentError(error)
+    if (!error) setAttachments((current) => [...current, ...incoming.map((file) => ({ id: newId(), file }))])
+  }
+  const say = async (message: string, previous?: Reply) => {
+    const written = message.trim() || (attachments.length > 0 ? 'Ayúdame a entender lo que adjunto.' : '')
+    if (!written || request.current) { input.current?.focus(); return }
     chatStore.getState().enter(actor.id)
-    const store = chatStore.getState()
-    const reply = answer(clean, { actor, members, records, enabled: family.enabledModules, today, emergencyNumber, canReadPhotos: photoReading && SERVER_HOUSEHOLD !== null })
-    const details = reply.kind === 'facts' || reply.kind === 'agenda' ? reply : undefined
-    const hasAttachments = attachments.length > 0
-    const useAssistant = shouldUseAssistant(reply, hasAttachments)
-    const userMessage = hasAttachments
-      ? `${clean}\n\nAdjuntos: ${attachments.map(({ file }) => file.name || 'archivo').join(', ')}`
-      : clean
+    const { conversationId } = chatStore.getState()
+    const files = attachments.map(({ file }) => file)
+    const shown = files.length ? `${written}\n\nAdjuntos: ${files.map((f) => f.name || 'imagen').join(', ')}` : written
+    const controller = new AbortController()
+    const result = respond(written, {
+      actor, members, records, origin, today, emergencyNumber, enabled: family.enabledModules,
+      previous: previous ?? turns.at(-1)?.reply, canReadPhotos: photoReading && SERVER_HOUSEHOLD !== null,
+    }, { connected: connectedChat, household: SERVER_HOUSEHOLD, conversationId, attachments: files, signal: controller.signal })
+    requestedScroll.current = true
     setText('')
+    setAttachments([])
     setAttachmentError(undefined)
     input.current?.focus({ preventScroll: true })
-    if (!useAssistant) {
-      store.add(clean, reply, details)
-      if (hasAttachments) setAttachmentError('No he procesado los adjuntos porque esta petición requiere una acción o respuesta local. Pregunta por el archivo en otro mensaje.')
-      return
+    if (result instanceof Promise) {
+      request.current = controller
+      setPending(shown)
     }
-    if (SERVER_HOUSEHOLD === null) {
-      store.add(userMessage, { kind: 'text', text: 'La conversación y la lectura de adjuntos necesitan el servidor local de Vita. Tus archivos siguen en este equipo.' }, details)
-      return
-    }
-
-    thinkingRef.current = true
-    setThinking(true)
-    const conversationId = store.conversationId
-    const turnId = store.add(userMessage, { kind: 'text', text: 'Estoy pensando…' }, details)
-    try {
-      const response = await askOrchestrator({ message: clean, conversationId, context: assistantContext(reply), attachments: attachments.map(({ file }) => file) })
-      const current = chatStore.getState()
-      if (current.actorId === actor.id && current.conversationId === conversationId) current.updateReply(turnId, { kind: 'assistant', text: response })
-      setAttachments([])
-      setAttachmentError(undefined)
-    } catch (error) {
-      const current = chatStore.getState()
-      if (current.actorId === actor.id && current.conversationId === conversationId) current.updateReply(turnId, { kind: 'text', text: describeError(error) })
-    } finally {
-      thinkingRef.current = false
-      setThinking(false)
-    }
+    const { reply, details, remote } = await result
+    const current = chatStore.getState()
+    if (controller.signal.aborted || current.actorId !== actor.id || current.conversationId !== conversationId) { request.current = null; setPending(''); return }
+    current.add(shown, reply, { details, remote })
+    if (files.length && !remote) setAttachmentError('No he leído los archivos: esta petición la resuelvo aquí. Pregunta por ellos en otro mensaje.')
+    if (spokenTurn.current && speech.available) speech.speak(reply.text)
+    spokenTurn.current = false
+    request.current = null
+    setPending('')
   }
-  const description = SERVER_HOUSEHOLD === null
-    ? 'El chat con IA y los adjuntos requieren el servidor local. En esta versión, las consultas del hogar se resuelven en este navegador.'
-    : 'Pega imágenes o adjunta JPG/PNG/WebP, PDF, TXT o DOCX. El archivo se lee localmente; tu pregunta, el texto extraído y los datos visibles necesarios se envían a Ollama Cloud. OpenClaw conserva el contexto del chat.'
+  const clear = () => {
+    const undo = restartConversation(chatStore)
+    toastStore.getState().show(RESTARTED, 'success', { label: 'Deshacer', run: undo })
+    input.current?.focus({ preventScroll: true })
+  }
+  const last = turns.at(-1)
+  const dayText = todaySummary({ actor, members, records, enabled: family.enabledModules, today, emergencyNumber, canReadPhotos: false })
+  // En la portada ya están los botones de inicio: las sugerencias solo si se viene de una habitación.
+  const chips = last ? followUps(last.reply) : origin ? suggestions.slice(0, 3) : []
+  const empty = !last && !pending
+  const Heading = panel ? 'h3' : 'h1'
   return (
-    <div className="mx-auto grid w-full max-w-3xl grid-cols-1 gap-5">
-      <PageHeader title="Pídeselo a Vita" description={description} />
-      <div role="log" aria-label="Conversación" className={turns.length === 0 ? 'sr-only' : undefined}>
-        <ol className="grid grid-cols-1 gap-5">
-        {turns.map((turn, i) => (
-          <li key={turn.id} ref={i === turns.length - 1 ? latest : undefined} tabIndex={-1} className="grid min-w-0 grid-cols-1 gap-3 focus-visible:outline">
-            <p className="ml-auto max-w-[85%] bg-marino px-4 py-2 break-words text-crema"><span className="sr-only">Tú: </span>{turn.message}</p>
-            <div className="min-w-0 bg-crema p-4 shadow-panel max-[24rem]:p-2"><span className="sr-only">Vita: </span><ReplyView turn={turn} /></div>
-          </li>
-        ))}
-        </ol>
+    <div className={`chat-shell ${panel ? 'chat-panel' : 'chat-page'}`}>
+      <div ref={history} className="chat-history">
+        <header className="chat-header">
+          <LogoMark className="chat-face" />
+          <div className="min-w-0">
+            <Heading className="text-3xl font-bold">{empty ? `${greeting(hour)}, ${actor.name}` : 'Tu conversación con Vita'}</Heading>
+            {empty && <p>{dayText}</p>}
+            {empty && <div className="mt-2"><ListenButton text={() => dayText} /></div>}
+            {empty && <p className="mt-2 text-apagado">Puedo ayudarte a apuntar una cita, consultar tu agenda o encontrar un dato de tu hogar.</p>}
+            {place && <p className="text-apagado">Hablas con Vita desde {place}.</p>}
+          </div>
+        </header>
+        {connectedChat && SERVER_HOUSEHOLD && <p className="chat-connection">Vita conectada está activa. Si necesito ayuda, consultaré tu mensaje con el servidor del hogar. Evita incluir datos privados.</p>}
+        {empty && <button type="button" className="chat-talk pixel-edge" onClick={talk}><Mic aria-hidden="true" />{voice.listening ? 'Te escucho…' : 'Pulsa y habla'}<span>o escribe abajo, como prefieras</span></button>}
+        {empty && <div className="chat-starters">{STARTERS.map(({ label, icon: Icon, example, editable }) => (
+          <button type="button" key={label} className="chat-starter pixel-edge" onClick={() => {
+            if (editable) { setText(example); input.current?.focus() }
+            else void say(example)
+          }}><Icon aria-hidden="true" />{label}</button>
+        ))}</div>}
+        <div role="log" aria-label="Conversación">
+          <ol className="chat-turns">
+            {turns.map((turn, i) => (
+              <li key={turn.id} className="chat-turn">
+                <p className="chat-person"><span className="sr-only">Tú: </span>{turn.message}</p>
+                <div ref={i === turns.length - 1 && !pending ? latest : undefined} className="chat-reply">
+                  <LogoMark className="chat-avatar" /><span className="sr-only">Vita: </span><ReplyView turn={turn} />
+                </div>
+              </li>
+            ))}
+            {pending && <li className="chat-turn"><p className="chat-person"><span className="sr-only">Tú: </span>{pending}</p></li>}
+          </ol>
+        </div>
+        <div ref={pending ? latest : undefined} role="status" aria-live="polite" className="chat-wait">{pending && 'Un momento, lo estoy mirando'}</div>
+        {last && <Button size="sm" icon={RotateCcw} disabled={!!pending} onClick={clear}>Empezar de nuevo</Button>}
       </div>
-      <form
-        ref={form}
-        onSubmit={(e: FormEvent) => { e.preventDefault(); void say(text) }}
+      <form ref={composer} onSubmit={(e: FormEvent) => { e.preventDefault(); void say(text) }} className={`chat-composer ${empty ? '' : 'chat-composer-sticky'}`}
         onPaste={(e) => {
+          if (!canAttach) return
           const pasted = [...e.clipboardData.files]
-          if (pasted.length === 0) {
-            pasted.push(...[...e.clipboardData.items]
-              .filter((item) => item.kind === 'file')
-              .flatMap((item) => {
-                const file = item.getAsFile()
-                return file ? [file] : []
-              }))
-          }
-          if (pasted.length > 0) {
-            e.preventDefault()
-            addAttachments(pasted)
-          }
-        }}
-        className="grid grid-cols-1 gap-3 bg-crema p-4 shadow-panel max-[24rem]:p-2"
-      >
-        <TextInput ref={input} label="Escribe a Vita" required={attachments.length === 0} autoComplete="off" maxLength={MAX_MESSAGE} value={text} disabled={thinking} onChange={(e) => setText(e.target.value)} />
+          if (pasted.length > 0) { e.preventDefault(); addAttachments(pasted) }
+        }}>
+        {resetToast?.action && <div role="status" className="chat-reset">{RESTARTED} <button type="button" onClick={() => { resetToast.action?.run(); toastStore.getState().dismiss(resetToast.id) }}>Deshacer</button></div>}
+        {chips.length > 0 && <div className="chat-chips" role="group" aria-label="Sugerencias">{chips.map(label => (
+          <button type="button" key={label} disabled={!!pending} onClick={() => void say(label, last?.reply)}>{label}</button>
+        ))}</div>}
+        <label className="sr-only" htmlFor="chat-message">Escribe a Vita</label>
+        <div className="chat-entry">
+          <textarea id="chat-message" ref={input} required={attachments.length === 0} rows={1} maxLength={MAX_MESSAGE} value={text} onChange={e => setText(e.target.value)}
+            placeholder="Por ejemplo, compra leche y pan" onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void say(text) }
+            }} />
+          <button type="button" className={`chat-mic ${voice.listening ? 'chat-mic-on' : ''}`} aria-pressed={voice.listening} aria-expanded={dictation === 'off' && canDictate() ? askVoice : undefined} onClick={talk}>
+            {voice.listening ? <Square aria-hidden="true" /> : <Mic aria-hidden="true" />}<span className="sr-only">{voice.listening ? 'Dejar de hablar' : 'Hablar'}</span>
+          </button>
+          <Button className="chat-send" disabled={!!pending || (!text.trim() && attachments.length === 0)} type="submit" variant="primary" icon={Send}><span className="max-[30rem]:sr-only">Enviar</span></Button>
+        </div>
+        {showExample && !voice.listening && <p>Escribe, por ejemplo: dentista el martes a las 10</p>}
+        <div className="chat-controls">
+          <p><Check aria-hidden="true" />Nada se guarda sin que lo confirmes</p>
+          <button type="button" className="chat-attach" onClick={() => setUploading(true)}><FileUp aria-hidden="true" />Subir documento</button>
+          {canAttach && <button type="button" className="chat-attach" disabled={!!pending} onClick={() => fileInput.current?.click()}><Paperclip aria-hidden="true" />Preguntar por un archivo</button>}
+          {speech.speaking && <Button size="sm" icon={Square} onClick={speech.stop}>Callar a Vita</Button>}
+        </div>
+        {askVoice && (
+          <div className="chat-voice-ask">
+            <p>Para hablar con Vita hace falta el micrófono. Solo escucha mientras el botón está pulsado y nada se guarda sin que lo confirmes. ¿Cómo prefieres?</p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="primary" onClick={() => chooseVoice('device')}>Solo en este dispositivo</Button>
+              <Button size="sm" onClick={() => chooseVoice('any')}>Con el servicio del navegador</Button>
+              <Button size="sm" onClick={() => setAskVoice(false)}>Ahora no</Button>
+            </div>
+            <p className="text-apagado">Con el servicio del navegador, tu voz puede enviarse a la empresa que lo hace (por ejemplo, Google o Apple). Puedes cambiarlo en Ajustes.</p>
+          </div>
+        )}
+        {noVoice && <p role="status">Este navegador no puede escuchar. Prueba con Chrome, Edge o Safari, o escríbelo: Vita lo entiende igual.</p>}
         {attachments.length > 0 && (
-          <ul aria-label="Adjuntos" className="grid grid-cols-1 gap-2">
+          <ul aria-label="Archivos para preguntar" className="grid grid-cols-1 gap-2">
             {attachments.map(({ id, file }) => (
               <li key={id} className="flex min-h-11 items-center gap-2 bg-yeso p-2">
                 <Paperclip aria-hidden="true" className="size-5 shrink-0" />
                 <span className="min-w-0 flex-1 break-words">{file.name || 'Imagen pegada'} <span className="text-apagado">({formatBytes(file.size)})</span></span>
-                <Button type="button" size="sm" icon={X} disabled={thinking} onClick={() => setAttachments((current) => current.filter((item) => item.id !== id))}>
-                  <span className="sr-only">Quitar {file.name || 'adjunto'}</span>
+                <Button type="button" size="sm" icon={X} disabled={!!pending} onClick={() => setAttachments((current) => current.filter((item) => item.id !== id))}>
+                  <span className="sr-only">Quitar {file.name || 'archivo'}</span>
                 </Button>
               </li>
             ))}
           </ul>
         )}
-        <div role="alert">{attachmentError && <FieldError id={undefined} message={attachmentError} />}</div>
-        <input
-          ref={fileInput}
-          type="file"
-          accept={CHAT_ATTACHMENT_ACCEPT}
-          multiple
-          disabled={thinking || SERVER_HOUSEHOLD === null}
-          className="sr-only"
-          aria-label="Adjuntar imágenes o documentos"
-          onChange={(e) => { addAttachments(Array.from(e.currentTarget.files ?? [])); e.currentTarget.value = '' }}
-        />
-        <div className="flex flex-wrap justify-between gap-3">
-          <div className="flex min-w-0 max-w-full flex-wrap gap-3">
-            <Button className={FORM_BUTTON} type="submit" variant="primary" icon={Send} disabled={thinking}>Enviar</Button>
-            <Button className={FORM_BUTTON} type="button" icon={Paperclip} disabled={thinking || SERVER_HOUSEHOLD === null} onClick={() => fileInput.current?.click()}>
-              Adjuntar
-            </Button>
-            {dictation !== 'off' && canDictate() && <Button className={FORM_BUTTON} icon={voice.listening ? Square : Mic} disabled={thinking} onClick={() => { if (voice.listening) voice.stop(); else void voice.start(dictation === 'any') }}>{voice.listening ? 'Dejar de dictar' : 'Dictar'}</Button>}
-          </div>
-          {turns.length > 0 && <Button className={FORM_BUTTON} icon={Trash2} disabled={thinking} onClick={() => { chatStore.getState().clear(); input.current?.focus() }}>Borrar conversación</Button>}
-        </div>
-        <output className="font-bold empty:hidden">{thinking ? 'Vita está pensando…' : voice.listening && 'Te escucho. Habla con calma.'}</output>
-        <div role="alert"><FieldError id={undefined} message={voice.problem} /></div>
+        {canAttach && <p className="text-apagado">El archivo se lee en el servidor del hogar y al asistente solo le llega el texto. No se guarda en Vita: para guardarlo, usa «Subir documento».</p>}
+        <p role="alert" className="empty:hidden">{attachmentError}</p>
+        {canAttach && <input ref={fileInput} type="file" accept={CHAT_ATTACHMENT_ACCEPT} multiple hidden aria-label="Elegir archivos para preguntar"
+          onChange={(e) => { addAttachments(Array.from(e.currentTarget.files ?? [])); e.currentTarget.value = '' }} />}
+        <UploadDialog open={uploading} onClose={() => setUploading(false)} />
+        <output className="empty:hidden">{voice.listening && 'Te escucho. Habla con calma.'}</output>
+        <p role="status" className="empty:hidden">{voice.problem}</p>
       </form>
-      <section aria-labelledby="chat-ideas">
-        <h2 id="chat-ideas" className="mb-2 text-lg font-bold">Prueba con</h2>
-        <ul className="flex flex-wrap gap-2">{SUGGESTIONS.map((s) => <li key={s} className="min-w-0 max-w-full"><Button size="sm" className="max-w-full [overflow-wrap:anywhere]" disabled={thinking} onClick={() => { void say(s) }}>{s}</Button></li>)}</ul>
-      </section>
     </div>
   )
 }

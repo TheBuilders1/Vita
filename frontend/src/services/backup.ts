@@ -17,7 +17,7 @@ const typeIds = new Set(RECORD_TYPES.map((t) => t.id))
 const envelopeSchema = z.object({ app: z.literal('vita'), version: z.number() })
 const bodySchema = z.object({
   family: z.object({ id, isDemo: z.boolean(), name: z.unknown(), enabledModules: z.unknown(), ...stamps }),
-  members: z.array(z.object({ id, order: z.number(), name: z.unknown(), birthDate: z.unknown(), relationship: z.unknown(), photo: z.unknown().optional(), role: z.unknown(), needs: z.unknown(), moduleAccess: z.unknown(), ...stamps })).min(1),
+  members: z.array(z.object({ id, order: z.number(), name: z.unknown(), birthDate: z.unknown(), relationship: z.unknown(), photo: z.unknown().optional(), notes: z.unknown().optional(), phone: z.unknown().optional(), role: z.unknown(), needs: z.unknown(), moduleAccess: z.unknown(), ...stamps })).min(1),
   records: z.array(z.object({
     id, typeId: z.string().refine((t) => typeIds.has(t)), ownerId: id, visibility: z.enum(['family', 'restricted', 'private']),
     sharedWith: z.array(id), data: z.record(z.string(), z.unknown()), ...stamps,

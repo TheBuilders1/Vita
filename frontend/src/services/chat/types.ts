@@ -12,6 +12,8 @@ export interface ChatContext {
   readonly enabled: readonly ModuleId[]
   readonly today: string
   readonly emergencyNumber: string
+  readonly origin?: ModuleId | 'calendar' | undefined
+  readonly previous?: Reply | undefined
   readonly canReadPhotos: boolean
 }
 
@@ -32,10 +34,17 @@ export type CardStatus = { readonly state: 'editing' } | { readonly state: 'save
 export interface AgendaMatch extends AgendaItem { readonly sources: readonly string[] }
 export interface Contact { readonly recordId: string; readonly name: string; readonly phone: string }
 
+export interface AgendaScope {
+  readonly memberIds: readonly string[]
+  readonly personal: boolean
+  readonly subject?: 'appointment' | 'task' | 'event' | 'medication'
+  readonly moduleId?: ModuleId
+}
+
 export type Reply =
   | { readonly kind: 'assistant'; readonly text: string }
   | { readonly kind: 'text'; readonly text: string; readonly link?: ChatLink }
-  | { readonly kind: 'agenda'; readonly text: string; readonly items: readonly AgendaMatch[]; readonly remaining: readonly AgendaMatch[] }
+  | { readonly kind: 'agenda'; readonly scope?: AgendaScope; readonly text: string; readonly items: readonly AgendaMatch[]; readonly remaining: readonly AgendaMatch[] }
   | { readonly kind: 'proposals'; readonly text: string; readonly proposals: readonly Proposal[] }
   | { readonly kind: 'complete'; readonly text: string; readonly choices: readonly CompletionChoice[] }
   | { readonly kind: 'facts'; readonly text: string; readonly facts: readonly Fact[] }

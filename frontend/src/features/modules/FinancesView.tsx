@@ -11,6 +11,7 @@ import { budgetAmounts, budgetWarning, categoryName, currentBudgets, monthSummar
 import { accessTo, canDelete, canUpdate } from '@/services/permissions'
 import { addMonths } from '@/utils/dates'
 import { formatDate, formatMoney, formatMonth } from '@/utils/format'
+import { QuarterReportBlock } from './QuarterReport'
 import { Block, ModuleRecords } from './shared'
 
 const MONTHS = 6
@@ -83,6 +84,7 @@ export function FinancesView() {
           </ul>
         )}
       </Block>
+      <Block title="Informe trimestral"><QuarterReportBlock /></Block>
       <Block title="Gasto de los últimos meses">
         <BarList label="Gasto por mes" bars={trend.map((t) => ({ key: t.month, label: formatMonth(t.month), value: t.expense, text: formatMoney(t.expense) }))} />
       </Block>

@@ -47,10 +47,10 @@ export function MemberPage() {
   const manages = canManage(actor, 'family')
   const own = member.id === actor.id
   const save = async (input: MemberInput) => {
-    const { name, birthDate, relationship, photo } = input
+    const { name, birthDate, relationship, photo, notes, phone } = input
     // Lo que puede ver se cambia en «Qué puede ver»: enviarlo desde aquí desharía lo recién elegido allí.
     const { moduleAccess: _elsewhere, ...profile } = input
-    await repositories.family.updateMember(actor.id, member.id, manages ? profile : { name, birthDate, relationship, photo })
+    await repositories.family.updateMember(actor.id, member.id, manages ? profile : { name, birthDate, relationship, photo, notes, phone })
     toastStore.getState().show('Perfil guardado')
   }
   return (

@@ -5,6 +5,7 @@ import { useHome } from '@/app/providers/home'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Notice } from '@/components/ui/Notice'
+import { GUIDES } from '@/data/guides'
 import { repositories } from '@/database'
 import { useToday } from '@/hooks/useToday'
 import type { RecordData } from '@/modules/fields'
@@ -98,6 +99,9 @@ export function RecordFormDialog({ type, record, preset, copyOf, onClose }: Reco
             <FieldControl field={field} value={value} error={firstMessage(errors[name])} people={people} member={member} inputRef={ref} onChange={onChange} onBusy={setUploading} locked={isSubmitting} />
           )} />
         ))}
+        {type.id === 'newsCheck' && <aside><h3 className="font-bold">Antes de reenviar, cinco preguntas</h3>
+          <ul className="list-disc pl-6">{GUIDES.digitalInfo?.[0]?.points.map((question) => <li key={question}>{question}</li>)}</ul>
+        </aside>}
         {type.visibility.locked
           ? <Notice>Lo verá todo el hogar: son datos para emergencias.</Notice>
           : <VisibilityInput value={sharing.visibility} sharedWith={sharing.sharedWith} canBePrivate={!record || record.ownerId === actor.id} onChange={(visibility, sharedWith) => setSharing({ visibility, sharedWith, touched: true })} />}

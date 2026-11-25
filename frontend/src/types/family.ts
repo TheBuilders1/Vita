@@ -39,6 +39,8 @@ export const memberInputSchema = (today: string) =>
       .refine((v) => v <= today, 'La fecha de nacimiento no puede ser futura'),
     relationship: z.string({ error: 'Indica el parentesco' }).trim().min(1, 'Indica el parentesco').max(60, 'Como máximo 60 caracteres'),
     photo: photoSchema,
+    notes: z.string().trim().max(500, 'Como máximo 500 caracteres').optional(),
+    phone: z.string().trim().max(30, 'Como máximo 30 caracteres').regex(/^$|^\+?[\d\s().-]{3,}$/, 'El teléfono no es válido').optional(),
     role: z.enum(ROLES, { error: 'Elige un rol' }),
     needs: z.array(z.enum(NEEDS)).default([]),
     moduleAccess: z.partialRecord(moduleIdSchema, accessSchema).default({}),
@@ -53,6 +55,8 @@ export interface Member {
   name: string
   birthDate: string
   relationship: string
+  notes?: string
+  phone?: string
   photo?: string
   role: Role
   needs: Need[]

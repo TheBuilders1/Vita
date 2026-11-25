@@ -1,7 +1,7 @@
 # Vita: frontend
 
 Gestión del hogar en un espacio privado, alrededor de un edificio isométrico de cinco plantas.
-Los datos se guardan en el navegador (IndexedDB). Con el backend de demostración local, las preguntas abiertas del chat van a Ollama Cloud junto con un máximo de 20 datos breves, filtrados localmente según permisos, cuando la pregunta requiere consultar el hogar. Las imágenes y documentos adjuntos se leen localmente: solo se envía el texto extraído, nunca el archivo original.
+Los datos se guardan en el navegador (IndexedDB). Con el backend de demostración local, las preguntas abiertas del chat van a Ollama Cloud junto con un máximo de 20 datos breves, filtrados localmente según permisos, cuando la pregunta requiere consultar el hogar. Las imágenes y documentos adjuntos se leen localmente: solo se envía el texto extraído, nunca el archivo original. El dictado remoto puede enviar la voz al proveedor del navegador.
 
 > Los datos **no están cifrados** en el navegador (la copia de seguridad sí puede llevar contraseña). Se pierden si se borra el almacenamiento del navegador, y los roles
 > simulan permisos dentro de la app: no protegen frente a quien use este dispositivo.

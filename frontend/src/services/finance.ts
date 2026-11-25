@@ -75,3 +75,77 @@ export function kidBalance(memberId: string, records: readonly FamilyRecord[]) {
 
 export const kidGoalSaved = (goalId: string, records: readonly FamilyRecord[]) =>
   sum(ofType(records, 'kidMovement').filter((m) => m.data.goal === goalId && m.data.kind === 'saving').map((m) => Number(m.data.amount)))
+
+export function goalEstimate(target: number, saved: number, weekly: number) {
+  const left = Math.max(0, target - saved)
+  return { left, weeks: left === 0 ? 0 : weekly > 0 ? Math.ceil(left / weekly) : null }
+}
+
+export function activeAllowances(memberId: string, records: readonly FamilyRecord[], today: string) {
+  const active = ofType(records, 'allowance').filter(({ data }) => data.member === memberId &&
+    String(data.startDate) <= today && (!data.endDate || String(data.endDate) >= today))
+  const amount = (repeat: string) => sum(active.filter(({ data }) => data.repeat === repeat).map(({ data }) => Number(data.amount)))
+  return { weekly: amount('weekly'), monthly: amount('monthly') }
+}
+
+export function weeklyGoalSavings(goalId: string, records: readonly FamilyRecord[], today: string) {
+  const from = addDays(today, -27)
+  const recent = records.filter(({ data }) => typeof data.date === 'string' && data.date >= from && data.date <= today)
+  return kidGoalSaved(goalId, recent) / 4
+}
+
+export interface QuarterMonth { readonly month: string; readonly income: number; readonly expense: number; readonly balance: number }
+export interface QuarterReport {
+  readonly year: number
+  readonly quarter: 1 | 2 | 3 | 4
+  readonly months: readonly QuarterMonth[]
+  readonly income: number
+  readonly expense: number
+  readonly balance: number
+  /** Porcentaje de los ingresos que queda; sin ingresos no tiene sentido. */
+  readonly savingRate: number | null
+  readonly categories: readonly { readonly category: string; readonly spent: number; readonly share: number }[]
+  readonly reading: readonly string[]
+}
+
+const monthName = new Intl.DateTimeFormat('es-ES', { month: 'long', timeZone: 'UTC' })
+export const monthLabel = (iso: string) => {
+  const name = monthName.format(new Date(`${iso.slice(0, 7)}-01T00:00:00Z`))
+  return name.charAt(0).toUpperCase() + name.slice(1)
+}
+
+/** El trimestre natural que contiene `day`, con la misma cuenta que el resumen del mes. Los meses posteriores a `today` aún no han pasado: no cuentan. */
+export function quarterReport(records: readonly FamilyRecord[], day: string, today = day): QuarterReport {
+  const year = Number(day.slice(0, 4))
+  const quarter = (Math.floor((Number(day.slice(5, 7)) - 1) / 3) + 1) as QuarterReport['quarter']
+  const first = `${year}-${String(quarter * 3 - 2).padStart(2, '0')}-01`
+  const summaries = [0, 1, 2].map((i) => addMonths(first, i)).filter((month) => month.slice(0, 7) <= today.slice(0, 7))
+    .map((month) => ({ month, ...monthSummary(records, month) }))
+  const spending = new Map<string, number>()
+  for (const s of summaries) for (const c of s.categories) spending.set(c.category, (spending.get(c.category) ?? 0) + c.spent)
+  const income = sum(summaries.map((s) => s.income))
+  const expense = sum(summaries.map((s) => s.expense))
+  const balance = income - expense
+  const categories = [...spending].filter(([, spent]) => spent > 0).toSorted((a, b) => b[1] - a[1])
+    .map(([category, spent]) => ({ category, spent, share: Math.round((spent / expense) * 100) }))
+  const savingRate = income > 0 ? Math.round((balance / income) * 100) : null
+  const reading: string[] = []
+  if (income === 0 && expense === 0) reading.push('No hay movimientos apuntados en este trimestre.')
+  else {
+    reading.push(savingRate === null ? 'No hay ingresos apuntados en este trimestre.'
+      : balance >= 0 ? `Balance positivo: se conserva el ${savingRate} % de los ingresos.`
+      : `Balance negativo: se ha gastado ${formatMoney(-balance)} más de lo que ha entrado.`)
+    const top = categories[0]
+    const peak = summaries.toSorted((a, b) => b.expense - a.expense)[0]
+    // Lo que sube más de un 10 % frente al trimestre anterior: suele ser un recibo que conviene revisar.
+    const before = new Map<string, number>()
+    for (const i of [-3, -2, -1]) for (const c of monthSummary(records, addMonths(first, i)).categories) before.set(c.category, (before.get(c.category) ?? 0) + c.spent)
+    for (const c of categories) {
+      const previous = before.get(c.category) ?? 0
+      const rise = previous > 0 ? Math.round(((c.spent - previous) / previous) * 100) : 0
+      if (rise > 10) reading.push(`${categoryName(c.category)} ha subido un ${rise} % respecto al trimestre anterior.`)
+    }
+    if (top && peak && peak.expense > 0) reading.push(`${categoryName(top.category)} concentra el ${top.share} % del gasto. ${monthLabel(peak.month)} es el mes con más gasto.`)
+  }
+  return { year, quarter, months: summaries.map(({ month, income: i, expense: e, balance: b }) => ({ month, income: i, expense: e, balance: b })), income, expense, balance, savingRate, categories, reading }
+}

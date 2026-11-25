@@ -5,7 +5,7 @@ import { cx } from '@/utils/cx'
 import { formatDay, WEEKDAYS } from '@/utils/format'
 import { CATEGORIES } from './categories'
 
-interface MonthGridProps { weeks: readonly string[][]; day: string; today: string; items: readonly AgendaItem[]; onSelect: (day: string) => void }
+interface MonthGridProps { weeks: readonly string[][]; day: string; today: string; items: readonly AgendaItem[]; onSelect: (day: string, openList: boolean) => void }
 
 const VISIBLE = 3
 const DAY_INITIALS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const
@@ -15,7 +15,7 @@ export function MonthGrid({ weeks, day, today, items, onSelect }: MonthGridProps
   const selected = useRef<HTMLButtonElement>(null)
   const moved = useRef(false)
   useEffect(() => {
-    if (moved.current) selected.current?.focus()
+    if (moved.current) selected.current?.focus({ preventScroll: true })
     moved.current = false
   }, [day])
 
@@ -28,7 +28,7 @@ export function MonthGrid({ weeks, day, today, items, onSelect }: MonthGridProps
     if (!target) return
     e.preventDefault()
     moved.current = true
-    onSelect(target)
+    onSelect(target, false)
   }
   return (
     <table className="w-full table-fixed border-collapse bg-crema shadow-panel">
@@ -46,6 +46,7 @@ export function MonthGrid({ weeks, day, today, items, onSelect }: MonthGridProps
           <tr key={week[0]}>
             {week.map((date) => {
               const own = items.filter((i) => occursOn(i, date))
+              const categories = [...new Set(own.map((item) => item.category))]
               const chips = own.filter((i) => !i.routine).slice(0, VISIBLE)
               const isSelected = date === day
               return (
@@ -56,16 +57,20 @@ export function MonthGrid({ weeks, day, today, items, onSelect }: MonthGridProps
                     tabIndex={isSelected ? 0 : -1}
                     aria-current={date === today ? 'date' : undefined}
                     aria-pressed={isSelected}
-                    onClick={() => onSelect(date)}
+                    onClick={() => onSelect(date, true)}
                     onKeyDown={onKeyDown}
                     className={cx('flex min-h-[44px] w-full flex-col items-center justify-center gap-0.5 px-0.5 py-0.5 text-left focus-visible:outline-offset-[-3px] sm:min-h-14 sm:items-start sm:justify-start sm:gap-1 sm:p-1.5 lg:min-h-28', isSelected ? 'bg-aviso-fondo max-sm:inset-ring-2 max-sm:inset-ring-marino' : 'hover:bg-yeso', date.slice(0, 7) !== day.slice(0, 7) && 'text-apagado')}
                   >
                     <span className={cx('grid min-w-0 max-w-full place-items-center font-bold tabular-nums max-sm:leading-tight sm:min-w-7', date === today && 'bg-marino text-crema max-sm:px-0.5')}>
                       <span aria-hidden="true" className="[overflow-wrap:anywhere]">{Number(date.slice(8))}</span>
-                      <span className="sr-only">{formatDay(date)}. {own.length === 0 ? 'Sin nada' : own.length === 1 ? '1 cosa' : `${own.length} cosas`}</span>
+                      <span className="sr-only">{formatDay(date)}. {own.length === 0 ? 'Sin nada' : own.length === 1 ? '1 cosa' : `${own.length} cosas`}{categories.length > 0 && `. ${categories.map((id) => CATEGORIES[id].label).join(', ')}`}</span>
                     </span>
                     {own.length > 0 && <>
-                      <span aria-hidden="true" className="size-1.5 rounded-full border border-current bg-current sm:hidden" />
+                      <span aria-hidden="true" className="flex w-full flex-wrap justify-center gap-0.5 sm:justify-start">
+                        {categories.map((id) => (
+                          <span key={id} title={CATEGORIES[id].label} className={`h-1.5 w-2.5 rounded-full bg-current ${CATEGORIES[id].text}`} />
+                        ))}
+                      </span>
                       <span aria-hidden="true" className="hidden bg-beige px-1.5 font-bold text-tinta sm:max-lg:inline">{own.length}</span>
                     </>}
                     <span aria-hidden="true" className="grid w-full grid-cols-1 gap-0.5 max-lg:hidden">

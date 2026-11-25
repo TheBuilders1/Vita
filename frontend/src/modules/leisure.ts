@@ -1,5 +1,13 @@
 import { RESTRICTED, defineModule, defineRecordType, notBefore, options } from './define'
 
+export const SHOPPING_CATEGORIES = options({
+  produce: 'Fruta y verdura', meatFish: 'Carne y pescado', dairy: 'Lácteos', pantry: 'Despensa',
+  frozen: 'Congelados', cleaning: 'Limpieza', hygiene: 'Higiene', other: 'Otros',
+})
+export const MEMORY_CATEGORIES = options({
+  birthday: 'Cumpleaños', travel: 'Viajes', celebrations: 'Fiestas', daily: 'Día a día', school: 'Colegio', other: 'Otros',
+})
+
 const outings = defineModule({
   id: 'outings', floor: 'leisure', name: 'Ocio',
   description: 'Planes, excursiones, salidas y vacaciones.',
@@ -15,7 +23,7 @@ const outings = defineModule({
         place: { kind: 'text', label: 'Lugar' },
         members: { kind: 'members', label: 'Quién va' },
         cost: { kind: 'money', label: 'Coste previsto' },
-        status: { kind: 'select', label: 'Estado', options: options({ idea: 'Idea', planned: 'Planeado', booked: 'Reservado', done: 'Hecho' }) },
+        status: { kind: 'select', label: 'Estado', options: options({ idea: 'Idea', planned: 'Planeado', booked: 'Reservado', done: 'Hecho', cancelled: 'Cancelado' }) },
         notes: { kind: 'textarea', label: 'Notas' },
       },
       rules: [notBefore('date', 'endDate', 'El plan no puede acabar antes de empezar')],
@@ -41,6 +49,7 @@ const shopping = defineModule({
       fields: {
         list: { kind: 'record', label: 'Lista', refType: 'shoppingList', required: true },
         name: { kind: 'text', label: 'Producto', required: true },
+        category: { kind: 'select', label: 'Categoría', options: SHOPPING_CATEGORIES },
         quantity: { kind: 'number', label: 'Cantidad', min: 0 },
         unit: { kind: 'text', label: 'Unidad', maxLength: 30 },
         price: { kind: 'money', label: 'Precio' },
@@ -52,7 +61,7 @@ const shopping = defineModule({
 
 const technology = defineModule({
   id: 'technology', floor: 'leisure', name: 'Tecnología',
-  description: 'Dispositivos, redes sociales y privacidad.',
+  description: 'Apunta los aparatos de casa, la wifi y las cuentas de cada uno para tenerlo todo a mano.',
   recordTypes: [
     defineRecordType({
       id: 'device', name: 'Dispositivo', plural: 'Dispositivos', titleField: 'name',
@@ -60,6 +69,7 @@ const technology = defineModule({
         name: { kind: 'text', label: 'Dispositivo', required: true },
         kind: { kind: 'select', label: 'Tipo', required: true, options: options({ phone: 'Móvil', tablet: 'Tableta', computer: 'Ordenador', console: 'Consola', tv: 'Televisión', other: 'Otro' }) },
         member: { kind: 'member', label: 'Quién lo usa' },
+        url: { kind: 'url', label: 'Enlace del dispositivo' },
         parentalControl: { kind: 'boolean', label: 'Tiene control parental activado' },
         agreements: { kind: 'textarea', label: 'Normas acordadas', help: 'Vita no controla el dispositivo: solo recuerda lo acordado.' },
         reviewDate: { kind: 'date', label: 'Próxima revisión' },
@@ -67,10 +77,19 @@ const technology = defineModule({
       agenda: [{ dateField: 'reviewDate', category: 'reminder', label: 'Revisar' }],
     }),
     defineRecordType({
+      id: 'wifi', name: 'Red wifi', plural: 'Redes wifi', titleField: 'name',
+      fields: {
+        name: { kind: 'text', label: 'Nombre de la red', required: true },
+        password: { kind: 'text', secret: true, label: 'Contraseña', help: 'Se guarda en este dispositivo y en las copias de seguridad que hagas. Podrán verla quienes tengan acceso a esta ficha.' },
+        location: { kind: 'text', label: 'Dónde está el router' },
+      },
+    }),
+    defineRecordType({
       id: 'socialAccount', name: 'Red social', plural: 'Redes sociales', titleField: 'network', visibility: RESTRICTED,
       fields: {
         network: { kind: 'text', label: 'Red o servicio', required: true },
         member: { kind: 'member', label: 'Persona', required: true },
+        url: { kind: 'url', label: 'Enlace del perfil' },
         privacy: { kind: 'select', label: 'Privacidad del perfil', required: true, options: options({ public: 'Público', friends: 'Solo contactos', private: 'Privado', unknown: 'Sin revisar' }) },
         twoFactor: { kind: 'boolean', label: 'Verificación en dos pasos activada' },
         reviewDate: { kind: 'date', label: 'Próxima revisión' },
@@ -143,6 +162,7 @@ const album = defineModule({
         members: { kind: 'members', label: 'Quién aparece' },
         files: { kind: 'files', label: 'Fotos y archivos' },
         links: { kind: 'links', label: 'Enlaces' },
+        category: { kind: 'select', label: 'Categoría', options: MEMORY_CATEGORIES },
         story: { kind: 'textarea', label: 'Historia' },
       },
     }),

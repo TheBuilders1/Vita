@@ -5,9 +5,10 @@ import { moduleLink } from '@/utils/links'
 import type { Member } from '@/types/family'
 import type { FamilyRecord } from '@/types/records'
 import { addDays, addMonths, ageOn, diffDays, startOfWeek, weekdayOf } from '@/utils/dates'
-import { formatDate, formatDay } from '@/utils/format'
+import { formatDate, formatDay, formatMoney } from '@/utils/format'
+import { kidBalance } from '@/services/finance'
 import { ambiguousNames, mentioned } from './people'
-import type { AgendaMatch, ChatContext, Fact, Reply } from './types'
+import type { AgendaMatch, AgendaScope, ChatContext, Fact, Reply } from './types'
 import { recordSources } from './visibility'
 import { findDate, plain } from './when'
 
@@ -30,18 +31,27 @@ function range(text: string, today: string): { from: string; to: string; label: 
   return { from: date, to: date, label: date === today ? 'hoy' : formatDay(date).toLowerCase() }
 }
 
-export function agenda(text: string, context: ChatContext): Reply {
+export function agenda(text: string, context: ChatContext, previous?: AgendaScope): Reply {
   const period = range(text, context.today)
   if (!period) return { kind: 'text', text: '¿Qué fecha quieres ver? Por ejemplo «¿qué tengo mañana?»' }
   const { from, to, label } = period
   const found = mentioned(text, context.members)
   if (ambiguousNames(found).length > 0) return { kind: 'text', text: 'Hay más de una persona con ese nombre. ¿De quién quieres ver la agenda?' }
-  const people = found.map((m) => m.id)
-  const mine = /\b(tengo|mis?|me)\b/.test(text)
+  const scope: AgendaScope = previous ?? {
+    memberIds: found.map((m) => m.id),
+    personal: /\b(tengo|mis?|me)\b/.test(text),
+    subject: /\bcitas?\b/.test(text) ? 'appointment' : /\btareas?\b/.test(text) ? 'task' : /\beventos?\b/.test(text) ? 'event' : undefined,
+    ...(context.origin && context.origin !== 'calendar' && { moduleId: context.origin }),
+  }
   const titles = titleContext(context.members, context.records)
-  const items = buildAgenda({ records: visible(context), members: context.enabled.includes('planner') ? context.members : [], from, to, today: context.today }).filter(({ memberIds }) => {
-    if (people.length > 0) return memberIds.some((id) => people.includes(id))
-    return !mine || memberIds.length === 0 || memberIds.includes(context.actor.id)
+  const items = buildAgenda({ records: visible(context), members: context.enabled.includes('planner') ? context.members : [], from, to, today: context.today }).filter(({ memberIds, moduleId, category, typeId }) => {
+    if (scope.moduleId && moduleId !== scope.moduleId) return false
+    if (scope.subject === 'appointment' && category !== 'appointment') return false
+    if (scope.subject === 'task' && typeId !== 'task') return false
+    if (scope.subject === 'event' && category !== 'event') return false
+    if (scope.subject === 'medication' && category !== 'medication') return false
+    if (scope.memberIds.length > 0) return memberIds.some((id) => scope.memberIds.includes(id))
+    return !scope.personal || memberIds.length === 0 || memberIds.includes(context.actor.id)
   }).map((item): AgendaMatch => {
     const record = item.recordId === undefined ? undefined : titles.records.get(item.recordId)
     if (!record) return { ...item, sources: [] }
@@ -55,7 +65,7 @@ export function agenda(text: string, context: ChatContext): Reply {
   })
   const shown = items.slice(0, MAX_ROWS)
   const reply = items.length === 0 ? `No hay nada apuntado para ${label}.` : `Esto es lo apuntado para ${label}:`
-  return { kind: 'agenda', text: reply, items: shown, remaining: items.slice(MAX_ROWS) }
+  return { kind: 'agenda', scope, text: reply, items: shown, remaining: items.slice(MAX_ROWS) }
 }
 
 function remaining(date: string, today: string): string {
@@ -160,4 +170,67 @@ export function shoppingPending(context: ChatContext): Reply {
       sources: recordSources(r, titles.records, amount ? undefined : 'list') }
   })
   return { kind: 'facts', text: 'Falta por comprar:', facts }
+}
+
+/** «He tomado la pastilla»: las tomas de hoy, cada una con su botón para confirmarla. */
+export function intakes(context: ChatContext): Reply {
+  const reply = agenda('hoy', context, { memberIds: [], personal: true, subject: 'medication' })
+  if (reply.kind !== 'agenda') return reply
+  const pending = reply.items.filter((i) => !i.done)
+  return pending.length === 0
+    ? { kind: 'text', text: 'No te queda ninguna toma por confirmar hoy.', link: { to: moduleLink('medication'), label: 'Ir a Medicación' } }
+    : { ...reply, items: pending, text: 'Marca la toma que has hecho:' }
+}
+
+export function wifi(context: ChatContext): Reply {
+  const networks = ofType(context, 'wifi')
+  if (networks.length === 0) return { kind: 'text', text: 'No hay ninguna red wifi apuntada.', link: { to: moduleLink('technology'), label: 'Ir a Tecnología' } }
+  return { kind: 'facts', text: 'Estas son las redes apuntadas:', facts: networks.map((r): Fact => ({
+    key: r.id, recordId: r.id, title: String(r.data.name),
+    text: [r.data.password ? `Clave: ${String(r.data.password)}` : 'Sin clave apuntada', r.data.location ? `Router: ${String(r.data.location)}` : ''].filter(Boolean).join('. '),
+  })) }
+}
+
+/** La nevera o todo lo que hay en casa, lo que caduca antes primero. */
+export function pantry(text: string, context: ChatContext): Reply {
+  const place = /\bcongelador/.test(text) ? 'freezer' : /\bdespensa/.test(text) ? 'pantry' : /\bnevera|\bfrigo/.test(text) ? 'fridge' : undefined
+  const titles = titleContext(context.members, context.records)
+  const food = ofType(context, 'foodItem').filter((r) => !place || r.data.place === place)
+    .toSorted((a, b) => String(a.data.expiryDate ?? '9999').localeCompare(String(b.data.expiryDate ?? '9999')))
+  if (food.length === 0) return { kind: 'text', text: 'No hay nada apuntado ahí.', link: { to: moduleLink('fridge'), label: 'Ir a Nevera y despensa' } }
+  return { kind: 'facts', text: 'Esto es lo apuntado:', facts: food.slice(0, MAX_ROWS).map((r): Fact => ({
+    key: r.id, recordId: r.id, title: recordTitle(r, titles),
+    text: [[r.data.quantity, r.data.unit].filter((v) => v !== undefined).join(' '), r.data.expiryDate ? `caduca el ${formatDate(String(r.data.expiryDate))}` : ''].filter(Boolean).join(', '),
+  })) }
+}
+
+export function pets(text: string, context: ChatContext): Reply {
+  const all = ofType(context, 'pet')
+  const named = all.filter((p) => plain(text).includes(plain(String(p.data.name))))
+  const list = named.length > 0 ? named : all
+  if (list.length === 0) return { kind: 'text', text: 'No hay ninguna mascota apuntada.', link: { to: moduleLink('pets'), label: 'Ir a Mascotas' } }
+  return { kind: 'facts', text: 'Su veterinario:', facts: list.map((p): Fact => ({
+    key: p.id, recordId: p.id, title: `${String(p.data.name)}: ${String(p.data.vet ?? 'sin veterinario apuntado')}`,
+    text: String(p.data.vetPhone ?? ''), ...(p.data.vetPhone ? { phone: String(p.data.vetPhone) } : {}),
+  })) }
+}
+
+export function kidMoney(text: string, context: ChatContext): Reply {
+  const [kid] = mentioned(text, context.members)
+  const who = kid ?? context.actor
+  if (!context.records.some((r) => r.moduleId === 'kidsMoney' && r.data.member === who.id)) return { kind: 'text', text: `No hay paga ni ahorros apuntados de ${who.name}.`, link: { to: moduleLink('kidsMoney'), label: 'Ir a Economía de los hijos' } }
+  const { available, saved } = kidBalance(who.id, context.records)
+  return { kind: 'text', text: `${who.name} tiene ${formatMoney(available)} para gastar y ${formatMoney(saved)} guardados.`, link: { to: moduleLink('kidsMoney'), label: 'Ver sus objetivos' } }
+}
+
+/** Lo primero que dice Vita al abrirla: lo de hoy y lo que caduca en tres días. */
+export function todaySummary(context: ChatContext): string {
+  const reply = agenda('hoy', context, { memberIds: [], personal: true })
+  const pending = reply.kind === 'agenda' ? [...reply.items, ...reply.remaining].filter((i) => !i.done) : []
+  const next = pending.find((i) => i.time)
+  const soon = ofType(context, 'foodItem').filter((r) => typeof r.data.expiryDate === 'string' && diffDays(context.today, r.data.expiryDate) <= 3).map((r) => String(r.data.name))
+  const parts = [pending.length === 0 ? 'Hoy no tienes nada pendiente.' : `Hoy tienes ${pending.length} ${pending.length === 1 ? 'cosa' : 'cosas'}.`]
+  if (next) parts.push(`Lo próximo: ${next.title} a las ${next.time}.`)
+  if (soon.length > 0) parts.push(`Caduca pronto: ${soon.slice(0, 3).join(', ')}.`)
+  return parts.join(' ')
 }
