@@ -72,11 +72,13 @@ services:
     environment:
       OPENCLAW_TOKEN: ${OPENCLAW_TOKEN:?Set OPENCLAW_TOKEN in .env}
       OPENCLAW_GATEWAY_PORT: ${OPENCLAW_GATEWAY_PORT:-18790}
-      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY}
       VITA_API_URL: http://127.0.0.1:8000
       NODE_OPTIONS: --max-old-space-size=1024
     volumes:
       - openclaw-data:/home/openclaw/.openclaw-vita-demo
+    # Comparte la red del equipo: el arranque obliga al Gateway a escuchar solo en loopback.
+    command: ["--host", "127.0.0.1"]
     healthcheck:
       test:
         [

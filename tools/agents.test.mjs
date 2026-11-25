@@ -52,7 +52,7 @@ const changes = {
     ['127.0.0.1:${POSTGRES_PORT', '0.0.0.0:${POSTGRES_PORT'],
     ...['privileged: true', 'pid: host', 'ipc: host', 'cap_add: [ALL]', 'volumes: [/var/run/docker.sock:/socket]'].map(s => ['    build: .', '    build: .\n    ' + s]),
     ...['POSTGRES_PASSWORD', 'VITA_API_PASSWORD', 'VITA_MIGRATOR_PASSWORD', 'VITA_DEMO_TOKENS'].map(s => ['${' + s + ':?Set ' + s + ' in .env}', '${' + s + '}']),
-    ['${OPENCLAW_TOKEN:-}', 'literal'], ['${GOOGLE_TOKEN_ENCRYPTION_KEY:-}', 'GOOGLE_TOKEN_ENCRYPTION_KEY: literal'],
+    ['${OPENCLAW_TOKEN:?Set OPENCLAW_TOKEN in .env}', 'literal'], ['${OLLAMA_API_KEY}', 'literal'], ['${GOOGLE_TOKEN_ENCRYPTION_KEY:-}', 'GOOGLE_TOKEN_ENCRYPTION_KEY: literal'],
     ['--host 127.0.0.1', '--host 0.0.0.0'], ['command:', 'otra:'], ['--host 127.0.0.1', '&& echo --host 127.0.0.1'],
     ['services:', 'services:\n  extra:\n    environment: [EXTRA_TOKEN=literal]'],
   ],
