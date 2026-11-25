@@ -155,7 +155,8 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
   }
   const last = turns.at(-1)
   const dayText = todaySummary({ actor, members, records, enabled: family.enabledModules, today, emergencyNumber, canReadPhotos: false })
-  const chips = last ? followUps(last.reply) : suggestions.slice(0, 3)
+  // En la portada ya están los botones de inicio: las sugerencias solo si se viene de una habitación.
+  const chips = last ? followUps(last.reply) : origin ? suggestions.slice(0, 3) : []
   const empty = !last && !pending
   const Heading = panel ? 'h3' : 'h1'
   return (
@@ -195,12 +196,12 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
         <div ref={pending ? latest : undefined} role="status" aria-live="polite" className="chat-wait">{pending && 'Un momento, lo estoy mirando'}</div>
         {last && <Button size="sm" icon={RotateCcw} disabled={!!pending} onClick={clear}>Empezar de nuevo</Button>}
       </div>
-      <form ref={composer} onSubmit={(e: FormEvent) => { e.preventDefault(); void say(text) }} className="chat-composer">
+      <form ref={composer} onSubmit={(e: FormEvent) => { e.preventDefault(); void say(text) }} className={`chat-composer ${empty ? '' : 'chat-composer-sticky'}`}>
         {resetToast?.action && <div role="status" className="chat-reset">{RESTARTED} <button type="button" onClick={() => { resetToast.action?.run(); toastStore.getState().dismiss(resetToast.id) }}>Deshacer</button></div>}
         {chips.length > 0 && <div className="chat-chips" role="group" aria-label="Sugerencias">{chips.map(label => (
           <button type="button" key={label} disabled={!!pending} onClick={() => void say(label, last?.reply)}>{label}</button>
         ))}</div>}
-        <label className="font-bold" htmlFor="chat-message">Escribe a Vita</label>
+        <label className="sr-only" htmlFor="chat-message">Escribe a Vita</label>
         <div className="chat-entry">
           <textarea id="chat-message" ref={input} required rows={1} maxLength={MAX_MESSAGE} value={text} onChange={e => setText(e.target.value)}
             placeholder="Por ejemplo, compra leche y pan" onKeyDown={e => {
@@ -214,7 +215,7 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
         {showExample && !voice.listening && <p>Escribe, por ejemplo: dentista el martes a las 10</p>}
         <div className="chat-controls">
           <p><Check aria-hidden="true" />Nada se guarda sin que lo confirmes</p>
-          <Button size="sm" icon={Paperclip} onClick={() => setUploading(true)}>Subir documento</Button>
+          <button type="button" className="chat-attach" onClick={() => setUploading(true)}><Paperclip aria-hidden="true" />Subir documento</button>
           {speech.speaking && <Button size="sm" icon={Square} onClick={speech.stop}>Callar a Vita</Button>}
         </div>
         {askVoice && (
