@@ -13,6 +13,19 @@
     },
   },
 
+  models: {
+    providers: {
+      "ollama-cloud": {
+        baseUrl: "https://ollama.com",
+        api: "ollama",
+        models: [
+          // El catálogo de OpenClaw 2026.11.8 anuncia más salida de la que acepta Ollama Cloud.
+          { id: "minimax-m3", name: "MiniMax M3", maxTokens: 131072 },
+        ],
+      },
+    },
+  },
+
   plugins: {
     allow: ["vita-tools", "ollama"],
     load: {
@@ -21,20 +34,6 @@
     entries: {
       "vita-tools": { enabled: true },
       ollama: { enabled: true },
-    },
-  },
-
-  models: {
-    providers: {
-      ollama: {
-        baseUrl: "http://127.0.0.1:11434",
-        api: "ollama",
-        apiKey: "ollama-local",
-        models: [
-          { id: "glm-5.2:cloud", name: "GLM 5.2 Cloud", input: ["text"] },
-          { id: "minimax-m3:cloud", name: "MiniMax M3 Cloud", input: ["text"] },
-        ],
-      },
     },
   },
 
@@ -55,7 +54,7 @@
     entries: {
       orquestador: {
         workspace: "/absolute/path/to/Vita/openclaw/agents/orquestador",
-        model: "ollama/glm-5.2:cloud",
+        model: "ollama-cloud/glm-5.2",
         tools: {
           // Los hijos heredan las herramientas de esta lista. El orquestador
           // tiene ambas herramientas disponibles, pero sus instrucciones le
@@ -75,7 +74,7 @@
       },
       calendario: {
         workspace: "/absolute/path/to/Vita/openclaw/agents/calendario",
-        model: "ollama/minimax-m3:cloud",
+        model: "ollama-cloud/minimax-m3",
         tools: {
           allow: ["vita_read_google_calendar"],
         },
@@ -85,7 +84,7 @@
       },
       documentos: {
         workspace: "/absolute/path/to/Vita/openclaw/agents/documentos",
-        model: "ollama/minimax-m3:cloud",
+        model: "ollama-cloud/minimax-m3",
         tools: {
           allow: ["vita_scan_document"],
         },

@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        fonts-dejavu-core tesseract-ocr tesseract-ocr-spa \
+        fonts-dejavu-core poppler-utils tesseract-ocr tesseract-ocr-spa \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 vita \
     && mkdir -p /data/private \

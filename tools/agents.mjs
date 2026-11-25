@@ -70,11 +70,15 @@ function configRules(config, check) {
   check(gateway.auth?.mode === 'token' && gateway.auth.token === '${OPENCLAW_TOKEN}', 'autenticación del gateway')
   const allowedPlugins = ['vita-tools', 'ollama']
   check(exact(plugins.allow, allowedPlugins) && exact(Object.keys(plugins.entries ?? {}), allowedPlugins), 'plugins permitidos')
-  const ollama = config.models?.providers?.ollama
-  check(plugins.entries?.ollama?.enabled === true && ollama?.api === 'ollama' &&
-    ollama.baseUrl === 'http://127.0.0.1:11434' && ollama.apiKey === 'ollama-local', 'API nativa de Ollama en loopback')
-  const models = ['glm-5.2:cloud', 'minimax-m3:cloud']
-  check(exact(ollama?.models?.map(model => model.id), models), 'catálogo de Ollama')
+  const providers = config.models?.providers ?? {}
+  const cloud = providers['ollama-cloud']
+  check(plugins.entries?.ollama?.enabled === true && exact(Object.keys(providers), ['ollama-cloud']) &&
+    exact(Object.keys(cloud ?? {}), ['baseUrl', 'api', 'models']) &&
+    cloud.baseUrl === 'https://ollama.com' && cloud.api === 'ollama', 'API oficial de Ollama Cloud')
+  const [miniMax] = Array.isArray(cloud?.models) ? cloud.models : []
+  check(cloud?.models?.length === 1 && miniMax?.id === 'minimax-m3' &&
+    exact(Object.keys(miniMax), ['id', 'name', 'maxTokens']) &&
+    Number.isInteger(miniMax.maxTokens) && miniMax.maxTokens > 0 && miniMax.maxTokens <= 131072, 'límite de salida de MiniMax M3')
   check(exact(Object.keys(agents.entries ?? {}), names), 'agentes permitidos')
   const limits = agents.defaults?.subagents ?? {}
   for (const key of ['maxSpawnDepth', 'maxChildrenPerAgent', 'maxConcurrent']) check(limits[key] === 1, key)
@@ -82,7 +86,7 @@ function configRules(config, check) {
   for (const name of names) {
     const agent = agents.entries?.[name] ?? {}
     const main = name === names[0]
-    check(agent.model === 'ollama/' + models[main ? 0 : 1], name + ': modelo de Ollama')
+    check(agent.model === (main ? 'ollama-cloud/glm-5.2' : 'ollama-cloud/minimax-m3'), name + ': modelo de Ollama Cloud')
     check(exact(Object.keys(agent.tools ?? {}), ['allow']), name + ': claves de tools')
     const allowedTools = main
       ? [...tools, 'sessions_spawn', 'sessions_yield']
@@ -225,6 +229,11 @@ export function checkAgents({ config, plugin, pluginPackage, pluginSource, agent
     agentes: () => {
       check(/reportRef[^.]*scanRef[^.]*calendarRef[^.]*mensaje[^.]*respuestas[^.]*son datos no confiables/i.test(agents.orquestador), 'instrucción sobre datos no confiables')
       check(/\bNo reveles referencias\b/i.test(agents.orquestador), 'protección de referencias')
+      check(/MODO DE CHAT NORMAL[\s\S]*?\bno uses herramientas ni delegues/i.test(agents.orquestador), 'chat conversacional sin herramientas')
+      check(/nombre por defecto es Vita[\s\S]*?no preguntes cómo quiere llamarte/i.test(agents.orquestador), 'identidad fija de Vita en el chat')
+      check(/responde exactamente: «¡Hola! Soy Vita, tu asistente personal\. ¿En qué puedo ayudarte\?»/i.test(agents.orquestador), 'saludo inicial fijo de Vita')
+      check(/visibleData[^.]*no la inventes/i.test(agents.orquestador), 'respuestas del chat basadas en datos visibles')
+      check(/attachments[^.]*contenido no confiable/i.test(agents.orquestador), 'adjuntos del chat no confiables')
       check(/\bno extraigas ni devuelvas texto OCR bruto\b/i.test(agents.documentos), 'protección del texto OCR')
       check(/calendarRef[^.]*vita_read_google_calendar/i.test(agents.calendario), 'herramienta del agente Calendar')
       check(/\bno delegas trabajo\b/i.test(agents.calendario), 'delegación desactivada para Calendar')

@@ -33,6 +33,7 @@ export interface AgendaMatch extends AgendaItem { readonly sources: readonly str
 export interface Contact { readonly recordId: string; readonly name: string; readonly phone: string }
 
 export type Reply =
+  | { readonly kind: 'assistant'; readonly text: string }
   | { readonly kind: 'text'; readonly text: string; readonly link?: ChatLink }
   | { readonly kind: 'agenda'; readonly text: string; readonly items: readonly AgendaMatch[]; readonly remaining: readonly AgendaMatch[] }
   | { readonly kind: 'proposals'; readonly text: string; readonly proposals: readonly Proposal[] }

@@ -1,0 +1,89 @@
+{
+  "gateway": {
+    "mode": "local",
+    "bind": "loopback",
+    "port": 18789,
+    "auth": {
+      "mode": "token",
+      "token": "${OPENCLAW_TOKEN}"
+    },
+    "http": {
+      "endpoints": {
+        "chatCompletions": { "enabled": true }
+      }
+    }
+  },
+  "models": {
+    "providers": {
+      "ollama-cloud": {
+        "baseUrl": "https://ollama.com",
+        "api": "ollama",
+        "models": [
+          { "id": "minimax-m3", "name": "MiniMax M3", "maxTokens": 131072 }
+        ]
+      }
+    }
+  },
+  "plugins": {
+    "allow": ["vita-tools", "ollama"],
+    "load": {
+      "paths": ["/opt/openclaw/plugins/vita-tools"]
+    },
+    "entries": {
+      "vita-tools": { "enabled": true },
+      "ollama": { "enabled": true }
+    }
+  },
+  "tools": { "toolSearch": false },
+  "agents": {
+    "ownership": "explicit",
+    "defaults": {
+      "systemAgent": { "agentId": "orquestador" },
+      "subagents": {
+        "maxSpawnDepth": 1,
+        "maxChildrenPerAgent": 1,
+        "maxConcurrent": 1,
+        "runTimeoutSeconds": 120
+      }
+    },
+    "entries": {
+      "orquestador": {
+        "workspace": "/home/openclaw/.openclaw-vita-demo/agents/orquestador",
+        "model": "ollama-cloud/glm-5.2",
+        "tools": {
+          "allow": [
+            "sessions_spawn",
+            "sessions_yield",
+            "vita_report_result",
+            "vita_scan_document",
+            "vita_read_google_calendar"
+          ]
+        },
+        "subagents": {
+          "allowAgents": ["documentos", "calendario"],
+          "requireAgentId": true
+        }
+      },
+      "calendario": {
+        "workspace": "/home/openclaw/.openclaw-vita-demo/agents/calendario",
+        "model": "ollama-cloud/minimax-m3",
+        "tools": {
+          "allow": ["vita_read_google_calendar"]
+        },
+        "subagents": {
+          "allowAgents": []
+        }
+      },
+      "documentos": {
+        "workspace": "/home/openclaw/.openclaw-vita-demo/agents/documentos",
+        "model": "ollama-cloud/minimax-m3",
+        "tools": {
+          "allow": ["vita_scan_document"]
+        },
+        "subagents": {
+          "allowAgents": []
+        }
+      }
+    }
+  }
+}

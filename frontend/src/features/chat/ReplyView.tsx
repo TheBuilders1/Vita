@@ -14,11 +14,14 @@ const LINK = 'inline-flex min-h-11 items-center font-bold underline underline-of
 
 export function ReplyView({ turn }: { turn: Turn }) {
   const { actor, members, records, family } = useHome()
-  const reply = reviewReply(turn.reply, { actor, members, records, enabled: family.enabledModules }, turn.cards)
+  const context = { actor, members, records, enabled: family.enabledModules }
+  const reply = reviewReply(turn.reply, context, turn.cards)
+  const details = turn.details && reviewReply(turn.details, context, turn.cards)
   return (
     <div className="grid min-w-0 grid-cols-1 gap-3 [overflow-wrap:anywhere]">
       <p className="break-words">{reply.text}</p>
       <Extra reply={reply} turn={turn} />
+      {details && <Extra reply={details} turn={turn} />}
     </div>
   )
 }
@@ -26,6 +29,7 @@ export function ReplyView({ turn }: { turn: Turn }) {
 function Extra({ reply, turn }: { reply: ReviewedReply; turn: Turn }) {
   switch (reply.kind) {
     case 'text': return reply.link ? <p><Link to={reply.link.to} className={LINK}>{reply.link.label}</Link></p> : null
+    case 'assistant': return null
     case 'agenda':
       return (
         <>

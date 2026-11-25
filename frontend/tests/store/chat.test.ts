@@ -28,3 +28,13 @@ test('no crece sin fin', () => {
   expect(store.getState().turns).toHaveLength(50)
   expect(store.getState().turns.at(-1)?.message).toBe('59')
 })
+test('separa sesiones al cambiar de perfil o borrar la conversación', () => {
+  const store = createChatStore()
+  store.getState().enter('ana')
+  const first = store.getState().conversationId
+  store.getState().clear()
+  expect(store.getState().conversationId).not.toBe(first)
+  const second = store.getState().conversationId
+  store.getState().enter('leo')
+  expect(store.getState().conversationId).not.toBe(second)
+})

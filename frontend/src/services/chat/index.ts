@@ -7,6 +7,16 @@ import type { ChatContext, Reply } from './types'
 import { cut, findRepeat, phrase } from './when'
 
 export { reviewReply, UNAVAILABLE } from './visibility'
+export {
+  askOrchestrator,
+  assistantContext,
+  shouldUseAssistant,
+  validateChatAttachments,
+  CHAT_ATTACHMENT_ACCEPT,
+  MAX_CHAT_ATTACHMENT_BYTES,
+  MAX_CHAT_ATTACHMENTS,
+  type AssistantContextItem,
+} from './assistant'
 export type { ReviewedReply } from './visibility'
 export type { CardStatus, ChatContext, ChatLink, CompletionChoice, Fact, Proposal, Reply } from './types'
 
@@ -32,8 +42,8 @@ const PHOTO = /\b(escane\w*|lee(?:r|me)? (?:la |una |esta )?(?:foto|caducidad|do
 const AGENDA = /^(?:que|cuales)\b.*\b(?:tengo|tenemos|tienes?|hay|toca|pendientes?|planes|eventos|citas)\b|^(?:mi )?(?:agenda|calendario)\b|^planes\b|^(?:tengo|tenemos|hay) (?:algo|planes|citas?)\b/
 const HELP = /^(?:hola|buen[oa]s\b|ayuda|que (?:puedes|sabes) hacer|quien eres|como funciona)/
 
-const HELP_TEXT = 'Entiendo frases sencillas: no soy inteligencia artificial y nada de lo que escribes sale de aquí. Puedo apuntar citas, tareas que se repiten y compra. También puedo buscar, revisar la agenda y el gasto del mes, o marcar una tarea como hecha. Nada se guarda hasta que tú lo confirmas.'
-const UNKNOWN = 'No te he entendido. Prueba con «apunta dentista para el martes a las 10», «compra leche y pan» o «qué tengo esta semana».'
+const HELP_TEXT = 'Hola. ¿En qué te puedo ayudar?'
+const UNKNOWN = 'Cuéntame un poco más y trataré de ayudarte.'
 
 function emergency({ records, emergencyNumber }: ChatContext, selfHarm: boolean): Reply {
   const contacts = records.filter((r) => r.typeId === 'emergencyContact')
@@ -88,7 +98,7 @@ export function answer(message: string, supplied: ChatContext): Reply {
   if (/\btelefono|\bnumero de\b|\bllamar a\b/.test(said)) return phones(said, context)
   if (/\bcompra\b|\bcomprar\b/.test(said)) return shoppingPending(context)
   if (AGENDA.test(said)) return agenda(said, context)
-  if (HELP.test(full.plain) || /^(?:que (?:puedes|sabes) hacer)/.test(said)) return { kind: 'text', text: HELP_TEXT }
-  if (/^(?:muchas )?gracias/.test(said)) return { kind: 'text', text: 'De nada.' }
-  return { kind: 'text', text: UNKNOWN }
-}
+   if (HELP.test(full.plain) || /^(?:que (?:puedes|sabes) hacer)/.test(said)) return { kind: 'assistant', text: HELP_TEXT }
+   if (/^(?:muchas )?gracias/.test(said)) return { kind: 'text', text: 'De nada.' }
+   return { kind: 'assistant', text: UNKNOWN }
+ }

@@ -2,6 +2,7 @@ import shutil
 import sys
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -33,6 +34,21 @@ def test_multiple_expiry_dates_are_ambiguous() -> None:
 def test_missing_or_invalid_expiry_date_is_not_guessed() -> None:
     assert extract_expiry_date("EXPEDICION: 2030-12-31").status == "date_missing"
     assert extract_expiry_date("CADUCIDAD: 31/02/2030").status == "date_missing"
+
+
+def test_read_text_runs_tesseract_on_image_bytes(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured = {}
+
+    def run(arguments, **options):
+        captured["arguments"] = arguments
+        captured["options"] = options
+        return SimpleNamespace(returncode=0, stdout=b"Texto local")
+
+    monkeypatch.setattr("app.ocr.subprocess.run", run)
+
+    assert TesseractOCR().read_text(b"imagen") == "Texto local"
+    assert captured["arguments"][:3] == ["tesseract", "stdin", "stdout"]
+    assert captured["options"]["input"] == b"imagen"
 
 
 @pytest.mark.parametrize(

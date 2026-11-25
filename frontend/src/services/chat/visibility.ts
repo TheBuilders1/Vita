@@ -9,7 +9,7 @@ type Hidden<T> = T & { readonly unavailable: true }
 type Reviewed<T, K> = T | Hidden<K>
 
 export type ReviewedReply =
-  | Extract<Reply, { kind: 'text' | 'complete' }>
+  | Extract<Reply, { kind: 'assistant' | 'text' | 'complete' }>
   | { readonly kind: 'agenda'; readonly text: string; readonly items: readonly Reviewed<AgendaMatch, Pick<AgendaMatch, 'key'>>[]; readonly more: number }
   | { readonly kind: 'facts'; readonly text: string; readonly facts: readonly Reviewed<Fact, Pick<Fact, 'key'>>[] }
   | { readonly kind: 'proposals'; readonly text: string; readonly proposals: readonly Reviewed<Proposal, object>[] }
@@ -50,6 +50,7 @@ export function reviewReply(reply: Reply, { actor, enabled, members, records }: 
 
   switch (reply.kind) {
     case 'text': return reply
+    case 'assistant': return reply
     case 'facts': {
       const facts = reply.facts.map((fact) => (
         (fact.recordId === undefined || visible.has(fact.recordId))
