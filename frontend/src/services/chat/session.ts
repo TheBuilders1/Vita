@@ -1,7 +1,6 @@
 import * as z from '@/utils/zod'
-import { MODULES, getRecordType } from '@/modules/registry'
+import { MODULES, RECORD_TYPES, getRecordType } from '@/modules/registry'
 import { isIsoDate, isTime } from '@/utils/dates'
-import { proposalType } from './connected'
 
 const str = z.string()
 const strings = z.array(str)
@@ -15,6 +14,8 @@ const item = z.object({
   label: str.optional(), detail: str.optional(), done: z.boolean().optional(), logStatus: str.optional(),
   routine: z.boolean().optional(), taskPreview: z.boolean().optional(),
 })
+// Cualquier ficha que exista: desde un archivo se puede proponer cualquiera.
+const proposalType = str.refine((id) => RECORD_TYPES.some((type) => type.id === id))
 const proposal = z.object({ typeId: proposalType, data: z.record(str, z.unknown()), ready: z.boolean(), notes: strings, missing: strings })
   .transform((p, ctx) => {
     const parsed = getRecordType(p.typeId).schema.safeParse(p.data)
@@ -39,7 +40,7 @@ const reply = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('emergency'), text: str, number: str, helpline: str.optional(), contacts: z.array(z.object({ recordId: str, name: str, phone: str })) }),
 ])
 const card = z.discriminatedUnion('state', [
-  z.object({ state: z.literal('saved'), recordId: str }), z.object({ state: z.literal('editing') }), z.object({ state: z.literal('undone') }),
+  z.object({ state: z.literal('saved'), recordId: str, server: z.enum(['saved', 'failed']).optional() }), z.object({ state: z.literal('editing') }), z.object({ state: z.literal('undone') }),
 ])
 export const MAX_TURNS = 50
 const details = reply.refine((r): r is Extract<typeof r, { kind: 'agenda' | 'facts' }> => r.kind === 'agenda' || r.kind === 'facts')

@@ -114,6 +114,8 @@ class TesseractOCR:
         return result.stdout.decode("utf-8", errors="replace")
 
     def scan(self, path: Path) -> ScanResult:
+        if path.suffix == ".pdf":
+            return self._scan_pdf(path)
         try:
             result = subprocess.run(
                 [
@@ -136,3 +138,17 @@ class TesseractOCR:
         if result.returncode != 0:
             raise OcrUnavailable
         return extract_expiry_date(result.stdout)
+
+    def _scan_pdf(self, path: Path) -> ScanResult:
+        # El mismo lector que los adjuntos del chat: texto del PDF y, si es escaneado, OCR de sus páginas.
+        from app.chat_attachments import ChatAttachmentError, _pdf_text
+
+        try:
+            text = _pdf_text(path.read_bytes(), self)
+        except ChatAttachmentError as exc:
+            if exc.code == "no_text_found":
+                return extract_expiry_date("")
+            raise OcrUnavailable from exc
+        except OSError as exc:
+            raise OcrUnavailable from exc
+        return extract_expiry_date(text)

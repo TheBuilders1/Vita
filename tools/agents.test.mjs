@@ -57,7 +57,7 @@ const changes = {
     ['fetcher(OLLAMA_CLOUD_CHAT_URL', 'fetcher(question'],
     ['VISION_INSTRUCTIONS', 'console.log("imagen"); const VISION_INSTRUCTIONS'],
   ],
-  orquestador: ['reportRef', 'scanRef', 'calendarRef', 'mensaje', 'respuestas', 'datos no confiables', 'No reveles referencias', 'MODO DE CHAT NORMAL', 'no uses herramientas ni delegues', 'nombre por defecto es Vita', 'no preguntes cómo quiere llamarte', 'responde exactamente:', 'tu asistente personal', 'visibleData', 'no la inventes', 'attachments', 'contenido no confiable'].map(s => [s, '', true]),
+  orquestador: ['reportRef', 'scanRef', 'calendarRef', 'mensaje', 'respuestas', 'datos no confiables', 'No reveles referencias', 'MODO DE CHAT NORMAL', 'no uses herramientas ni delegues', 'nombre por defecto es Vita', 'no preguntes cómo quiere llamarte', 'responde exactamente:', 'tu asistente personal', 'qué puedes hacer', 'pulse «Guardar»', 'visibleData', 'no la inventes', 'attachments', 'contenido no confiable'].map(s => [s, '', true]),
   documentos: [['no extraigas ni devuelvas texto OCR bruto', 'devuelve texto OCR bruto']],
   calendario: [['vita_read_google_calendar', 'vita_write_google_calendar']],
   'vita-vision-orquestador': ['exactamente una tarea', 'vita-vision', 'context: "isolated"', 'visibleData', 'historial', 'nombres de archivos'].map(s => [s, '', true]),

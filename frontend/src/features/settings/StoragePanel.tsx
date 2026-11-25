@@ -32,7 +32,7 @@ export function StoragePanel() {
   return (
     <Panel title="Privacidad y almacenamiento">
       <div className="grid grid-cols-1 gap-3">
-        <p>Todo se guarda en este navegador, sin cifrar. {sends && 'Al servidor de tu hogar van las fotos de documentos que mandes leer.'}{chat && ' Vita conectada consulta al servidor cuando no entiende un mensaje; OpenClaw puede conservar el texto de la conversación. Los adjuntos se leen allí; solo si marcas análisis visual una imagen puede enviarse a Ollama Cloud. Puedes ver qué se envía en el ajuste «Vita conectada».'}{!sends && !chat && 'Vita no envía nada a ningún servidor.'}{dictates && ' Si dictas, tu navegador puede enviar la voz a su fabricante.'}</p>
+        <p>Todo se guarda en este navegador, sin cifrar. {sends && 'Al servidor de tu hogar van las fotos de documentos que mandes leer.'}{chat && ' Con Vita conectada, el chat va al asistente del servidor y OpenClaw puede conservar el texto de la conversación. Solo si marcas el análisis visual, una imagen puede enviarse a Ollama Cloud. Puedes ver qué se envía en el ajuste «Vita conectada».'}{!sends && !chat && 'Vita no envía nada a ningún servidor.'}{dictates && ' Si dictas, tu navegador puede enviar la voz a su fabricante.'}</p>
         <p>Los datos se pierden si borras los datos de navegación, usas una ventana privada o cambias de dispositivo.</p>
         {storage?.usage !== undefined && <p>Espacio usado por Vita: <strong>{formatBytes(storage.usage)}</strong></p>}
         {storage && (storage.persisted

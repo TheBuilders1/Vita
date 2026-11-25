@@ -1,5 +1,6 @@
 import { Camera, FileText, IdCard, Lightbulb, Paperclip } from 'lucide-react'
 import { useRef, useState, type ChangeEvent } from 'react'
+import { useStore } from 'zustand'
 import { useHome } from '@/app/providers/home'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
@@ -11,14 +12,19 @@ import { useToday } from '@/hooks/useToday'
 import { getRecordType } from '@/modules/registry'
 import type { RecordData } from '@/modules/fields'
 import { describeError } from '@/services/errors'
+import { catalogFor, toProposal, understandFile, type Hint } from '@/services/chat/understand'
+import { SERVER_HOUSEHOLD } from '@/services/homeServer'
+import { settingsStore, toastStore } from '@/store'
+import { keepFilesOnServer } from '@/services/serverDocuments'
 import { ACCEPTED_TYPES } from '@/types/records'
 import { preparePhoto } from '@/utils/photo'
 
 type Kind = 'light' | 'id' | 'other'
 
-/** Subir un papel en dos pasos: qué es y el archivo. Después se abre su ficha ya rellena para revisarla. */
+/** Subir un papel en dos pasos: qué es y el archivo. Con el servidor del hogar, Vita lo lee y abre su ficha rellena para revisarla. */
 export function UploadDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { actor, family } = useHome()
+  const { actor, family, members } = useHome()
+  const canRead = useStore(settingsStore, (s) => s.settings.connectedChat) && SERVER_HOUSEHOLD !== null
   const today = useToday()
   const editor = useRecordEditor()
   const [kind, setKind] = useState<Kind>()
@@ -31,10 +37,18 @@ export function UploadDialog({ open, onClose }: { open: boolean; onClose: () => 
   const close = () => { setKind(undefined); setError(undefined); onClose() }
 
   const presets: Record<Kind, [string, RecordData]> = {
-    light: ['transaction', { kind: 'expense', concept: 'Factura de la luz', category: 'home', date: today }],
+    light: ['transaction', { kind: 'expense', concept: 'Factura', category: 'home', date: today }],
     id: ['document', { kind: 'id', title: `DNI de ${actor.name}`, member: actor.id }],
     other: ['document', { kind: 'other', title: '' }],
   }
+  // Al guardar la ficha, sus fotos y PDF también van a la base del servidor del hogar.
+  const keepOnServer = canRead && SERVER_HOUSEHOLD !== null ? (saved: RecordData) => {
+    const fileIds = Array.isArray(saved.files) ? saved.files as string[] : []
+    void keepFilesOnServer(fileIds, { household: SERVER_HOUSEHOLD!, get: (fileId) => repositories.files.get(actor.id, fileId) }).then((kept) => {
+      if (kept.kept) toastStore.getState().show('El archivo también está guardado en el servidor de tu hogar.')
+      if (kept.failed) toastStore.getState().show('No se ha podido copiar el archivo al servidor de tu hogar: sigue guardado en este dispositivo.', 'error')
+    })
+  } : undefined
   const upload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -43,10 +57,22 @@ export function UploadDialog({ open, onClose }: { open: boolean; onClose: () => 
     setError(undefined)
     try {
       // shortcut: si se cancela la ficha, el archivo queda guardado sin usar; limpiar huérfanos cuando haya papelera de archivos.
-      const { id } = await repositories.files.add(actor.id, await preparePhoto(file))
+      const photo = await preparePhoto(file)
+      const { id } = await repositories.files.add(actor.id, photo)
       const [typeId, preset] = presets[kind]
+      if (canRead) {
+        const hint: Hint = kind === 'light' ? 'bill' : kind
+        try {
+          const proposal = toProposal(await understandFile(photo, hint, catalogFor(actor, family.enabledModules), { signal: new AbortController().signal }), { fileId: id, members, actorId: actor.id, today })
+          close()
+          editor.create(proposal.typeId, proposal.data, keepOnServer)
+          return
+        } catch (cause) {
+          toastStore.getState().show(describeError(cause), 'error')
+        }
+      }
       close()
-      editor.create(typeId, { ...preset, files: [id] })
+      editor.create(typeId, { ...preset, files: [id] }, keepOnServer)
     } catch (cause) {
       setError(describeError(cause))
     } finally {
@@ -54,8 +80,8 @@ export function UploadDialog({ open, onClose }: { open: boolean; onClose: () => 
     }
   }
   const choices = [
-    canBill && { id: 'light' as const, icon: Lightbulb, label: 'Factura de la luz', hint: 'Se apunta como gasto de vivienda con la factura adjunta.' },
-    canDocument && { id: 'id' as const, icon: IdCard, label: 'DNI', hint: 'Se guarda en Documentación. Podrás apuntar cuándo caduca.' },
+    canBill && { id: 'light' as const, icon: Lightbulb, label: 'Una factura', hint: canRead ? 'Luz, agua, gas, teléfono… Vita lee el importe y la fecha y la apunta como gasto.' : 'Se apunta como gasto con la factura adjunta.' },
+    canDocument && { id: 'id' as const, icon: IdCard, label: 'DNI', hint: canRead ? 'Vita lee de quién es y cuándo caduca, y lo guarda en Documentación.' : 'Se guarda en Documentación. Podrás apuntar cuándo caduca.' },
     canDocument && { id: 'other' as const, icon: FileText, label: 'Otro documento', hint: 'Contratos, seguros, recetas, papeles del colegio…' },
   ].filter(Boolean) as { id: Kind; icon: typeof FileText; label: string; hint: string }[]
 
@@ -81,7 +107,7 @@ export function UploadDialog({ open, onClose }: { open: boolean; onClose: () => 
           </div>
           <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { void upload(e) }} />
           <input ref={picker} type="file" accept={ACCEPTED_TYPES.join(',')} hidden onChange={(e) => { void upload(e) }} />
-          <p role="status">{busy && 'Guardando el archivo…'}</p>
+          <p role="status">{busy && (canRead ? 'Leyendo el documento… Puede tardar un poco.' : 'Guardando el archivo…')}</p>
         </div>
       )}
     </Dialog>

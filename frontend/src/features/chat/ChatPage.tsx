@@ -12,8 +12,11 @@ import { MODULES } from '@/modules/registry'
 import type { ModuleId } from '@/modules/types'
 import { accessTo } from '@/services/permissions'
 import { respond, followUps } from '@/services/chat/connected'
-import { CHAT_ATTACHMENT_ACCEPT, isChatImage, MAX_MESSAGE, todaySummary, validateChatAttachments, type ChatAssistantAttachment, type Reply } from '@/services/chat'
+import { CHAT_ATTACHMENT_ACCEPT, isChatImage, MAX_MESSAGE, todaySummary, validateChatAttachments, type Reply } from '@/services/chat'
 import { formatBytes } from '@/utils/format'
+import { preparePhoto } from '@/utils/photo'
+import { repositories } from '@/database'
+import { catalogFor, proposeFromFiles, savingIntent, understandFile } from '@/services/chat/understand'
 import { newId } from '@/utils/ids'
 import { ListenButton } from '@/components/ui/ListenButton'
 import { joinDictation } from '@/services/dictation'
@@ -24,6 +27,7 @@ import { chatStore, settingsStore, toastStore } from '@/store'
 import { greeting, restartConversation, scrollDistance } from './conversation'
 import { UploadDialog } from '@/features/dashboard/UploadDialog'
 import { ReplyView } from './ReplyView'
+import { plainText } from './richText'
 
 const SUGGESTIONS = ['¿Qué tengo esta semana?', 'Busca el DNI', '¿Cuánto llevamos en comida?', 'Recuérdame regar las plantas cada lunes a las 9']
 const ROOM_IDEAS: Partial<Record<ModuleId, string>> = {
@@ -122,7 +126,7 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
   // Al abrir el panel se ve lo último de la conversación, junto a donde se escribe.
   useEffect(() => { if (panel) composer.current?.scrollIntoView({ block: 'end' }) }, [panel])
 
-  // Los adjuntos los lee el servidor del hogar: solo se ofrecen con él y con el permiso de Ajustes.
+  // Leer un archivo por dentro necesita el servidor del hogar y el permiso de Ajustes. Pegarlo o adjuntarlo, no.
   const canAttach = connectedChat && SERVER_HOUSEHOLD !== null
   const addAttachments = (incoming: readonly File[]) => {
     const error = validateChatAttachments([...attachments.map(({ file }) => file), ...incoming])
@@ -132,24 +136,24 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
   const allowVisualAnalysis = (id: string, analyzeVisually: boolean) => setAttachments((current) =>
     current.map((attachment) => attachment.id === id ? { ...attachment, analyzeVisually } : attachment))
   const say = async (message: string, previous?: Reply) => {
+    const files = attachments.map(({ file }) => file)
+    // Con archivos siempre sale la tarjeta para guardarlos; si además se pregunta, contesta el asistente.
+    if (files.length && !request.current) { void keep(attachments, message.trim()); return }
     const written = message.trim() || (attachments.length > 0 ? 'Ayúdame a entender lo que adjunto.' : '')
     if (!written || request.current) { input.current?.focus(); return }
     chatStore.getState().enter(actor.id)
     const { conversationId } = chatStore.getState()
-    const files = attachments.map(({ file }) => file)
-    const assistantAttachments: ChatAssistantAttachment[] = attachments.map(({ file, analyzeVisually }) => ({ file, analyzeVisually }))
     const shown = files.length ? `${written}\n\nAdjuntos: ${files.map((f) => f.name || 'imagen').join(', ')}` : written
     const controller = new AbortController()
     const result = respond(written, {
       actor, members, records, origin, today, emergencyNumber, enabled: family.enabledModules,
       previous: previous ?? turns.at(-1)?.reply, canReadPhotos: photoReading && SERVER_HOUSEHOLD !== null,
-    }, { connected: connectedChat, household: SERVER_HOUSEHOLD, conversationId, attachments: assistantAttachments, signal: controller.signal })
-    const remoteRequest = result instanceof Promise
+    }, { connected: connectedChat, household: SERVER_HOUSEHOLD, conversationId, signal: controller.signal })
     requestedScroll.current = true
     setText('')
     setAttachmentError(undefined)
     input.current?.focus({ preventScroll: true })
-    if (remoteRequest) {
+    if (result instanceof Promise) {
       request.current = controller
       setPending(shown)
     }
@@ -157,15 +161,50 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
     const current = chatStore.getState()
     if (controller.signal.aborted || current.actorId !== actor.id || current.conversationId !== conversationId) { request.current = null; setPending(''); return }
     current.add(shown, reply, { details, remote })
-    if (files.length && !remote) setAttachmentError(remoteRequest
-      ? 'No se pudo completar el análisis; los archivos siguen adjuntos para que puedas reintentarlo.'
-      : 'Esta petición se resolvió aquí y no se enviaron los archivos. Pregunta por ellos en otro mensaje.')
-    if (remote) setAttachments([])
-    else if (files.length) setText((currentText) => currentText || written)
-    if (spokenTurn.current && speech.available) speech.speak(reply.text)
+    if (files.length && !remote) setAttachmentError('No he leído los archivos: esta petición la resuelvo aquí. Pregunta por ellos en otro mensaje.')
+    if (spokenTurn.current && speech.available) speech.speak(plainText(reply.text))
     spokenTurn.current = false
     request.current = null
     setPending('')
+  }
+  /** Guardar lo pegado o adjuntado: Vita lo lee y propone la ficha rellena para confirmarla. */
+  const keep = async (items: readonly ChatAttachment[], written: string) => {
+    const files = items.map(({ file }) => file)
+    chatStore.getState().enter(actor.id)
+    const { conversationId } = chatStore.getState()
+    const shown = `${written || 'Guarda esto'}\n\nAdjuntos: ${files.map((f) => f.name || 'imagen').join(', ')}`
+    const controller = new AbortController()
+    request.current = controller
+    requestedScroll.current = true
+    setText('')
+    setAttachments([])
+    setAttachmentError(undefined)
+    setPending(shown)
+    let reply: Reply
+    try {
+      const catalog = catalogFor(actor, family.enabledModules)
+      const question = written && !savingIntent(written) && canAttach
+        ? respond(written, { actor, members, records, origin, today, emergencyNumber, enabled: family.enabledModules, canReadPhotos: false },
+          { connected: true, household: SERVER_HOUSEHOLD, conversationId, attachments: items.map(({ file, analyzeVisually }) => ({ file, analyzeVisually })), signal: controller.signal })
+        : undefined
+      const [cards, answer] = await Promise.all([proposeFromFiles(files, written, {
+        store: async (file) => (await repositories.files.add(actor.id, await preparePhoto(file))).id,
+        read: canAttach ? (file, hint, signal) => understandFile(file, hint, catalog, { signal }) : undefined,
+        members, actorId: actor.id, today, signal: controller.signal,
+      }), question])
+      const unread = items.some(({ file, analyzeVisually }) => isChatImage(file) && !analyzeVisually)
+      reply = answer?.remote ? { ...cards, text: answer.reply.text }
+        : answer ? { ...cards, text: `${cards.text} No he podido contestar a tu pregunta sobre el archivo.${unread ? ' Si es una imagen sin texto, marca su análisis visual y vuelve a preguntar.' : ''}` }
+          : cards
+    } catch (cause) {
+      reply = { kind: 'text', text: describeError(cause) }
+    }
+    request.current = null
+    setPending('')
+    const current = chatStore.getState()
+    if (controller.signal.aborted || current.actorId !== actor.id || current.conversationId !== conversationId) return
+    current.add(shown, reply)
+    input.current?.focus({ preventScroll: true })
   }
   const clear = () => {
     const undo = restartConversation(chatStore)
@@ -191,7 +230,7 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
             {place && <p className="text-apagado">Hablas con Vita desde {place}.</p>}
           </div>
         </header>
-        {connectedChat && SERVER_HOUSEHOLD && <p className="chat-connection">Vita conectada está activa. Si necesito ayuda, consultaré tu mensaje con el servidor del hogar. Evita incluir datos privados.</p>}
+        {connectedChat && SERVER_HOUSEHOLD && <p className="chat-connection">Hablas con el asistente del servidor de tu hogar. Lo que apuntes se guarda solo en este dispositivo y cuando lo confirmes. Evita escribir datos privados que no hagan falta.</p>}
         {empty && <button type="button" className="chat-talk pixel-edge" onClick={talk}><Mic aria-hidden="true" />{voice.listening ? 'Te escucho…' : 'Pulsa y habla'}<span>o escribe abajo, como prefieras</span></button>}
         {empty && <div className="chat-starters">{STARTERS.map(({ label, icon: Icon, example, editable }) => (
           <button type="button" key={label} className="chat-starter pixel-edge" onClick={() => {
@@ -217,8 +256,9 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
       </div>
       <form ref={composer} onSubmit={(e: FormEvent) => { e.preventDefault(); void say(text) }} className={`chat-composer ${empty ? '' : 'chat-composer-sticky'}`}
         onPaste={(e) => {
-          if (!canAttach) return
-          const pasted = [...e.clipboardData.files]
+          // Una captura de pantalla llega como «item», no siempre como archivo.
+          const pasted = e.clipboardData.files.length ? [...e.clipboardData.files]
+            : [...e.clipboardData.items].flatMap((item) => (item.kind === 'file' ? [item.getAsFile()] : [])).filter((f): f is File => f !== null)
           if (pasted.length > 0) { e.preventDefault(); addAttachments(pasted) }
         }}>
         {resetToast?.action && <div role="status" className="chat-reset">{RESTARTED} <button type="button" onClick={() => { resetToast.action?.run(); toastStore.getState().dismiss(resetToast.id) }}>Deshacer</button></div>}
@@ -240,12 +280,12 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
         <div className="chat-controls">
           <p><Check aria-hidden="true" />Nada se guarda sin que lo confirmes</p>
           <button type="button" className="chat-attach" onClick={() => setUploading(true)}><FileUp aria-hidden="true" />Subir documento</button>
-          {canAttach && <button type="button" className="chat-attach" disabled={!!pending} onClick={() => fileInput.current?.click()}><Paperclip aria-hidden="true" />Preguntar por un archivo</button>}
+          <button type="button" className="chat-attach" disabled={!!pending} onClick={() => fileInput.current?.click()}><Paperclip aria-hidden="true" />Adjuntar archivo</button>
           {speech.speaking && <Button size="sm" icon={Square} onClick={speech.stop}>Callar a Vita</Button>}
         </div>
         {noVoice && <p role="status">Este navegador no puede escuchar. Prueba con Chrome, Edge o Safari, o escríbelo: Vita lo entiende igual.</p>}
         {attachments.length > 0 && (
-          <ul aria-label="Archivos para preguntar" className="grid grid-cols-1 gap-2">
+          <ul aria-label="Archivos adjuntos" className="grid grid-cols-1 gap-2">
             {attachments.map(({ id, file, analyzeVisually }) => (
               <li key={id} className="flex min-h-11 flex-wrap items-center gap-2 bg-yeso p-2">
                 <Paperclip aria-hidden="true" className="size-5 shrink-0" />
@@ -253,7 +293,7 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
                 <Button type="button" size="sm" icon={X} disabled={!!pending} onClick={() => setAttachments((current) => current.filter((item) => item.id !== id))}>
                   <span className="sr-only">Quitar {file.name || 'archivo'}</span>
                 </Button>
-                {isChatImage(file) && (
+                {canAttach && isChatImage(file) && (
                   <label className="flex basis-full items-start gap-2 text-sm">
                     <input
                       type="checkbox"
@@ -270,10 +310,12 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
             ))}
           </ul>
         )}
-        {canAttach && <p className="text-apagado">Por defecto, el OCR se hace en el servidor del hogar y solo se envía el texto. Una imagen marcada puede enviarse a Ollama Cloud si hace falta el análisis visual; no se guarda en Vita.</p>}
+        {attachments.length > 0 && <p className="text-apagado">{canAttach
+          ? 'Envíalo sin escribir nada y Vita lo leerá para proponerte la ficha. Si escribes una pregunta, te contesta sobre el archivo. Se lee en el servidor de tu hogar y solo se envía el texto; una imagen marcada para análisis visual puede enviarse a Ollama Cloud.'
+          : 'Envíalo y Vita lo guardará en este dispositivo. Para leerlo por dentro hace falta el servidor del hogar.'}</p>}
         <p role="alert" className="empty:hidden">{attachmentError}</p>
-        {canAttach && <input ref={fileInput} type="file" accept={CHAT_ATTACHMENT_ACCEPT} multiple hidden aria-label="Elegir archivos para preguntar"
-          onChange={(e) => { addAttachments(Array.from(e.currentTarget.files ?? [])); e.currentTarget.value = '' }} />}
+        <input ref={fileInput} type="file" accept={CHAT_ATTACHMENT_ACCEPT} multiple hidden aria-label="Elegir archivos para adjuntar"
+          onChange={(e) => { addAttachments(Array.from(e.currentTarget.files ?? [])); e.currentTarget.value = '' }} />
         <UploadDialog open={uploading} onClose={() => setUploading(false)} />
         <output className="empty:hidden">{voice.listening && 'Te escucho. Habla con calma.'}</output>
         {voice.listening && dictation !== 'device' && <p className="text-base text-apagado">Tu navegador convierte la voz en texto con su servicio (por ejemplo, Google o Apple). Puedes cambiarlo en Ajustes.</p>}
