@@ -42,6 +42,8 @@ def test_reads_any_kind_of_record_from_the_catalog() -> None:
         "La factura es de 1.538,06 €.",
         json.dumps({"typeId": "vacaciones", "data": {}}),
         json.dumps({"typeId": "transaction", "data": {"iban": "ES00 0000"}}),
+        'Es una factura.\n{"typeId":"transaction","data":{"iban":"ES00 0000"}}',
+        f"Es una factura.\n{json.dumps(BILL)}\n{json.dumps(BILL)}",
         json.dumps({"typeId": "transaction", "data": {"concept": {"a": {"b": 1}}}}),
         json.dumps({"typeId": "transaction", "data": {}, "extra": True}),
     ],
@@ -90,8 +92,13 @@ def read(test: TestClient, kind: str = "bill", catalog: str | None = None):
     )
 
 
-def test_the_model_gets_text_and_catalog_and_the_page_gets_the_record() -> None:
-    test, gateway = client(json.dumps(BILL))
+@pytest.mark.parametrize("answer", [
+    json.dumps(BILL),
+    f"He encontrado el importe y la fecha.\n\n{json.dumps(BILL, indent=2)}",
+    f"He encontrado el importe y la fecha.\n\n```json\n{json.dumps(BILL)}\n```",
+])
+def test_the_model_gets_text_and_catalog_and_the_page_gets_the_record(answer: str) -> None:
+    test, gateway = client(answer)
     response = read(test)
     assert response.status_code == 200
     assert response.json() == BILL
