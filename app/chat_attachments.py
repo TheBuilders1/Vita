@@ -8,7 +8,7 @@ from io import BytesIO
 from pathlib import Path
 from xml.etree import ElementTree
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app.config import Settings
 from app.images import ImageRejected, inspect_image
@@ -130,7 +130,7 @@ def _webp_png(data: bytes, settings: Settings) -> bytes:
             with Image.open(BytesIO(data)) as image:
                 image.load()
                 output = BytesIO()
-                image.convert("RGB").save(output, format="PNG")
+                ImageOps.exif_transpose(image).convert("RGB").save(output, format="PNG")
                 return output.getvalue()
     except ChatAttachmentError:
         raise
@@ -141,6 +141,25 @@ def _webp_png(data: bytes, settings: Settings) -> bytes:
         OSError,
         ValueError,
     ) as exc:
+        raise ChatAttachmentError("invalid_attachment") from exc
+
+
+_ORIENTATION = 0x0112
+
+
+def _upright(data: bytes) -> bytes:
+    """El móvil guarda la foto tumbada y anota el giro; Tesseract no lo aplica y leería basura.
+
+    Solo se toca la foto que lleva giro: las demás llegan al OCR tal cual. Ya se ha comprobado con inspect_image.
+    """
+    try:
+        with Image.open(BytesIO(data)) as image:
+            if image.getexif().get(_ORIENTATION, 1) == 1:
+                return data
+            output = BytesIO()
+            ImageOps.exif_transpose(image).convert("RGB").save(output, format="PNG")
+            return output.getvalue()
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
         raise ChatAttachmentError("invalid_attachment") from exc
 
 
@@ -182,7 +201,7 @@ def extract_chat_attachment(
                 settings.max_image_dimension,
                 settings.max_image_pixels,
             )
-            text = ocr.read_text(data)
+            text = ocr.read_text(_upright(data))
         elif mime == "image/webp":
             text = ocr.read_text(_webp_png(data, settings))
         elif data.startswith(b"%PDF-") and (suffix == ".pdf" or mime == "application/pdf"):
