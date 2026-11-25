@@ -181,12 +181,14 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
     let reply: Reply
     try {
       const catalog = catalogFor(actor, family.enabledModules)
+      // Al servidor va la misma foto que se guarda: derecha, reducida y sin la ubicación. La del móvil viene tumbada.
+      const ready = await Promise.all(files.map((file) => preparePhoto(file)))
       const question = written && !savingIntent(written) && canAttach
         ? respond(written, { actor, members, records, origin, today, emergencyNumber, enabled: family.enabledModules, canReadPhotos: false },
-          { connected: true, household: SERVER_HOUSEHOLD, conversationId, attachments: files, signal: controller.signal })
+          { connected: true, household: SERVER_HOUSEHOLD, conversationId, attachments: ready, signal: controller.signal })
         : undefined
-      const [cards, answer] = await Promise.all([proposeFromFiles(files, written, {
-        store: async (file) => (await repositories.files.add(actor.id, await preparePhoto(file))).id,
+      const [cards, answer] = await Promise.all([proposeFromFiles(ready, written, {
+        store: async (file) => (await repositories.files.add(actor.id, file)).id,
         read: canAttach ? (file, hint, signal) => understandFile(file, hint, catalog, { signal }) : undefined,
         members, actorId: actor.id, today, signal: controller.signal,
       }), question])

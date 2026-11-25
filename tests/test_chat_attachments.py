@@ -59,6 +59,48 @@ def test_converts_webp_to_png_for_local_ocr() -> None:
     assert extract_chat_attachment(webp_bytes(), "foto.webp", "image/webp", settings(), PngOcr()) == "Texto del WebP"
 
 
+def phone_photo(image_format: str, orientation: int) -> bytes:
+    """Como la guarda un móvil en vertical: los píxeles apaisados (40×30) y el giro anotado."""
+    exif = Image.Exif()
+    exif[0x0112] = orientation
+    output = BytesIO()
+    Image.new("RGB", (40, 30), "white").save(output, format=image_format, exif=exif)
+    return output.getvalue()
+
+
+class SizeOcr:
+    def __init__(self) -> None:
+        self.size: tuple[int, int] | None = None
+
+    def read_text(self, data: bytes) -> str:
+        with Image.open(BytesIO(data)) as image:
+            self.size = image.size
+        return "Factura"
+
+
+@pytest.mark.parametrize(
+    ("image_format", "mime", "name"),
+    [("JPEG", "image/jpeg", "factura.jpg"), ("PNG", "image/png", "factura.png"), ("WEBP", "image/webp", "factura.webp")],
+)
+def test_the_ocr_reads_a_phone_photo_upright(image_format: str, mime: str, name: str) -> None:
+    ocr = SizeOcr()
+    assert extract_chat_attachment(phone_photo(image_format, 6), name, mime, settings(), ocr) == "Factura"
+    assert ocr.size == (30, 40)
+
+
+def test_a_photo_without_rotation_reaches_the_ocr_untouched() -> None:
+    received: list[bytes] = []
+
+    class RecordingOcr:
+        def read_text(self, data: bytes) -> str:
+            received.append(data)
+            return "Factura"
+
+    photo = phone_photo("JPEG", 1)
+    extract_chat_attachment(photo, "factura.jpg", "image/jpeg", settings(), RecordingOcr())
+    assert received == [photo]
+
+
 def test_extracts_pdf_text_and_uses_local_ocr_for_scanned_pages(monkeypatch: pytest.MonkeyPatch) -> None:
     import app.chat_attachments as attachments
 
