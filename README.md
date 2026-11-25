@@ -8,6 +8,8 @@
 
 Comidas, colegio, salud, cuentas y planes: cada cosa en su habitación, en tu propio dispositivo.
 
+Vita también incluye un backend local y opcional para demostraciones: conversa mediante el orquestador de OpenClaw, acepta adjuntos para extracción local de texto, delega tareas a subagentes y consulta Google Calendar en modo de solo lectura mediante OAuth. Las preguntas del chat se envían a Ollama Cloud con un máximo de 20 datos breves filtrados localmente cuando se necesitan; los archivos originales no se envían. Calendar solo consulta el calendario principal, con autorización explícita y un rango de hasta 31 días; no crea ni modifica eventos. **No uses documentos reales ni publiques la API o el Gateway de OpenClaw.**
+
 [![Despliegue](https://github.com/TheBuilders1/Vita/actions/workflows/deploy.yml/badge.svg?branch=development)](https://github.com/TheBuilders1/Vita/actions/workflows/deploy.yml)
 ![React 19](https://img.shields.io/badge/React-19-24344d)
 ![TypeScript 7](https://img.shields.io/badge/TypeScript-7-24344d)
@@ -77,7 +79,9 @@ pnpm dev
 | `pnpm check` | Linter, tipos, pruebas y compilación |
 | `pnpm build && pnpm e2e` | Pruebas en navegador y de accesibilidad sobre la versión compilada |
 
-La web funciona sola. El backend es opcional y se arranca aparte: ver [docs/backend.md](docs/backend.md).
+La web funciona sola. Para levantar el frontend, el backend, PostgreSQL y OpenClaw a la vez en Linux, usa `docker compose up --build` desde la raíz; ver [docs/backend.md](docs/backend.md) para la configuración.
+
+El backend de demostración añade autenticación local, ejecución asíncrona con resultados validados, OAuth individual para Calendar con refresh tokens cifrados y OCR privado de imágenes ficticias. La persona confirma cualquier fecha antes de que se guarde un recordatorio. Consulta [docs/backend.md](docs/backend.md) para configuración, seguridad y ejemplos.
 
 ## Arquitectura
 
@@ -91,21 +95,22 @@ flowchart LR
   subgraph demo["Demo local, opcional y privada"]
     api["FastAPI<br/>autentica, valida y escribe"] --> pg[("PostgreSQL")]
     api --> ocr["Tesseract local"]
-    api <--> claw["OpenClaw<br/>orquestador → documentos"]
+    api <--> claw["OpenClaw<br/>orquestador → documentos / calendario"]
+    api --> gcal["Google Calendar<br/>(OAuth, solo lectura)"]
   end
   ui -. "solo con pnpm dev" .-> api
 ```
 
 - **Frontend** ([`frontend/`](frontend/)): guarda todo en el navegador. Cada módulo se declara una vez y de ahí salen validación, formularios, listados y agenda.
-- **Backend** ([`app/`](app/)): demo local que lee la caducidad de un documento a partir de su foto. Delega en agentes, pero la API es la única que decide y escribe.
-- **Agentes** ([`openclaw/`](openclaw/)): interpretan y delegan. No tienen acceso a la base de datos, a las imágenes ni a internet.
+- **Backend** ([`app/`](app/)): demo local para OCR y consultas de Google Calendar de solo lectura. Delega en agentes, pero la API es la única que autoriza, valida y escribe.
+- **Agentes** ([`openclaw/`](openclaw/)): el orquestador usa GLM 5.2 para conversar y coordinar; los subagentes usan MiniMax M3. No acceden directamente a la base de datos ni a las imágenes, ni tienen herramientas de navegación web.
 
 | Capa | Tecnología |
 | --- | --- |
 | Interfaz | React 19, TypeScript 7, Tailwind 4, React Router 8 |
 | Edificio 3D | Three.js y React Three Fiber, con geometría y texturas propias |
 | Datos en el navegador | Dexie (IndexedDB), Zod, Web Crypto |
-| Backend | FastAPI, PostgreSQL 16, Tesseract, OpenClaw |
+| Backend | FastAPI, PostgreSQL 16, Tesseract, OpenClaw, Google Calendar API |
 | Pruebas | Vitest, Playwright, axe, pytest |
 
 ## Seguridad y privacidad
@@ -152,7 +157,8 @@ Se trabaja sobre `development`. Los mensajes de commit siguen [Conventional Comm
 app/  migrations/  database/   backend y base de datos
 openclaw/                      agentes y su plugin
 frontend/                      aplicación web
-tests/backend/                 pruebas del backend
+tests/                         pruebas del backend
+frontend/tests/                pruebas del frontend
 tools/                         guardianes del repositorio y servidor de pruebas
 .github/                       despliegue y plantillas
 docs/                          documentación

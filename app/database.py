@@ -23,7 +23,8 @@ def recover_interrupted_runs(settings: Settings) -> int:
                 error_code = 'interrupted',
                 finished_at = now(),
                 report_ref_hash = NULL,
-                scan_ref_hash = NULL
+                scan_ref_hash = NULL,
+                calendar_ref_hash = NULL
             WHERE status IN ('queued', 'running')
             RETURNING id
             """

@@ -19,12 +19,40 @@ const dateOutcome = Type.Union([
   ),
 ]);
 
+const calendarEventsOutcome = Type.Object(
+  {
+    status: Type.Literal("calendar_events"),
+    events: Type.Array(
+      Type.Object(
+        {
+          summary: Type.String({ minLength: 1, maxLength: 250 }),
+          start: Type.String({ minLength: 10, maxLength: 35 }),
+          end: Type.String({ minLength: 10, maxLength: 35 }),
+          allDay: Type.Boolean(),
+        },
+        { additionalProperties: false },
+      ),
+      { maxItems: 50 },
+    ),
+    timeZone: Type.String({ minLength: 1, maxLength: 64 }),
+    startDate: Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$" }),
+    endDate: Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$" }),
+    truncated: Type.Boolean(),
+  },
+  { additionalProperties: false },
+);
+
 const reportOutcome = Type.Union([
   dateOutcome,
+  calendarEventsOutcome,
   Type.Object(
     {
       status: Type.Literal("failed"),
-      errorCode: Type.Literal("document_agent_failed"),
+      errorCode: Type.Union([
+        Type.Literal("document_agent_failed"),
+        Type.Literal("calendar_agent_failed"),
+        Type.Literal("agent_failed"),
+      ]),
     },
     { additionalProperties: false },
   ),
@@ -76,6 +104,27 @@ export default definePluginEntry({
       outputSchema: dateOutcome,
       async execute(_id, params) {
         const result = await callVita("v1/internal/scan", params.scanRef);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result) }],
+          details: result,
+        };
+      },
+    });
+
+    api.registerTool({
+      name: "vita_read_google_calendar",
+      description:
+        "Lee eventos de la cuenta Google conectada para el rango aprobado. Requiere calendarRef opaca; nunca recibe ni devuelve credenciales OAuth. Los instantes start/end están en UTC; interpreta fechas y horas del hogar usando timeZone.",
+      parameters: Type.Object(
+        { calendarRef: Type.String({ minLength: 32, maxLength: 128 }) },
+        { additionalProperties: false },
+      ),
+      outputSchema: calendarEventsOutcome,
+      async execute(_id, params) {
+        const result = await callVita(
+          "v1/internal/calendar/read",
+          params.calendarRef,
+        );
         return {
           content: [{ type: "text", text: JSON.stringify(result) }],
           details: result,

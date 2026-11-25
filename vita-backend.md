@@ -12,6 +12,7 @@ Construir para el hackathon un backend que reciba peticiones, las delegue desde 
 
 - **API:** Python con FastAPI, Uvicorn y `psycopg` 3 para PostgreSQL. Usar migraciones SQL y Docker Compose para el entorno local. Un proceso de API basta para la demo.
 - **OpenClaw:** gateway privado. El orquestador acepta una petición y delega en `documentos` mediante `sessions_spawn`. Usar un subagente nativo con `context: "isolated"`, lista de agentes permitidos y sin delegación adicional. Los agentes no tienen acceso directo a la base de datos, al almacenamiento ni a herramientas de ejecución, navegador o mensajería.
+- **Calendar:** `calendario` es otro subagente aislado, sin delegación adicional. La API maneja OAuth de usuario, conserva cifrado el refresh token y consulta Calendar API de solo lectura. El subagente recibe una referencia efímera, nunca credenciales, y devuelve al orquestador una respuesta estructurada y verificable. Acotar a calendario principal, máximo 31 días y 50 eventos. No permitir escrituras en Calendar.
 - **Responsabilidades:** OpenClaw interpreta y delega. La API autentica, comprueba permisos, valida resultados y ejecuta todas las escrituras. Un mensaje del agente no acredita el éxito de una operación ni equivale a una confirmación del usuario.
 - **PostgreSQL:** una instancia y dos esquemas para la demo: `gestion`, para usuarios y hogares, y `producto`, para ejecuciones, documentos y recordatorios. Usar roles de base de datos separados. Si gestión necesita aislamiento operativo o restauración independiente, moverla a otra instancia.
 - **Sin esquema por usuario ni base de grafos.** Usar tablas compartidas con `household_id` y, donde corresponda, `owner_user_id`. Los `JOIN` cubren las consultas del MVP. Revisar el grafo solo si aparecen recorridos que el modelo relacional no resuelve bien.
@@ -32,6 +33,9 @@ Si la prueba no cierra el recorrido, resolver el retorno antes de añadir OCR o 
 | Ruta | Comportamiento |
 | --- | --- |
 | `POST /v1/runs` | Recibe `message` y `householdId`. Comprueba membresía, crea una ejecución y responde `202` con `runId`. En la ampliación acepta `documentId`. |
+| `POST /v1/calendar/connect` | Inicia OAuth de solo lectura para el usuario autenticado. |
+| `GET /v1/calendar/status` | Informa del estado de la conexión propia. |
+| `DELETE /v1/calendar/connection` | Elimina el refresh token cifrado propio. |
 | `GET /v1/runs/{run_id}` | Devuelve estado y, cuando corresponda, resultado validado o código de error. Solo puede leerlo quien inició la ejecución. |
 
 - Sembrar dos hogares y usuarios ficticios. Para la demo local, asociar tokens de prueba a usuarios en el servidor; no aceptar `userId` ni identificadores de sesión de OpenClaw suministrados por el cliente. No implementar registro, OAuth ni gestión de contraseñas.
@@ -39,6 +43,7 @@ Si la prueba no cierra el recorrido, resolver el retorno antes de añadir OCR o 
 - Estados del primer hito: `queued`, `running`, `completed`, `failed`, `timed_out`. Aceptar resultados solo para la ejecución activa y dentro del plazo. Los resultados duplicados o tardíos no cambian un estado final.
 - La ejecución se despacha en el proceso de API. Tras un reinicio, marcar como fallidas las ejecuciones interrumpidas; no reanudarlas ni repetir la delegación automáticamente.
 - La API valida la forma del resultado antes de exponerlo. Ejemplo: `status: "date_found"` con `expiresOn` (`YYYY-MM-DD`), o `status: "date_missing"` sin fecha.
+- Para Calendar, `POST /v1/runs` también acepta `{ "calendar": { "startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD" } }`. La API asocia a la ejecución una referencia opaca y de vida limitada; `vita_read_google_calendar` aplica la autorización del usuario y obtiene eventos de la ventana. Se almacena el resultado obtenido y no se acepta que el agente lo altere. `calendar` y `documentId` son mutuamente excluyentes.
 
 **Criterio de salida:** el guion de `curl` lanza una ejecución y muestra el resultado. La traza de OpenClaw confirma qué subagente se ejecutó. Un fallo del hijo o un timeout produce un estado terminal, no un éxito. Un usuario ajeno no puede consultar la ejecución.
 
@@ -65,6 +70,17 @@ Los documentos y avisos son privados para su propietario. Pertenecer al hogar, i
 
 **Criterio de salida:** una foto ficticia queda guardada en privado, el OCR propone una fecha y el aviso solo aparece tras confirmación. Una foto ilegible permite introducir la fecha manualmente. Una confirmación repetida no genera un segundo aviso.
 
+## Hito 3 — Google Calendar en modo de lectura
+
+1. Crear OAuth client de tipo Web en Google Cloud, activar Calendar API y autorizar exactamente la URL callback de Vita. Usar `calendar.events.readonly`, nunca el scope de escritura. Usar un `state` aleatorio fuerte y redirigir tras procesar el callback a una URL limpia.
+2. El usuario inicia `/v1/calendar/connect` autenticado con Vita. Guardar el `state` hash y el nonce OIDC cifrado, ligados al usuario, junto con el PKCE verifier cifrado, con TTL de 10 minutos; consumirlos una sola vez. Validar ID token y asociar la conexión con su `sub` verificado.
+3. Cifrar refresh tokens en PostgreSQL con una clave Fernet externa al repo. El backend canjea/refresca tokens; OpenClaw nunca recibe tokens ni puede consultar Google de manera directa.
+4. Al crear un run, exigir un rango explícito e inclusivo de hasta 31 días. Consultar el calendario `primary`, expandir recurrencias y limitar a 50 eventos. Convertir inicios y finales con hora a UTC; incluir la zona IANA del hogar para interpretar y presentar horas locales.
+5. El plugin consume una `calendarRef` ligada al usuario/run, una sola vez y antes del deadline. El backend filtra la respuesta del proveedor a `summary`, `start`, `end` y `allDay`, la guarda y verifica coincidencia exacta cuando el orquestador la informa. No incluir links, asistentes ni descripciones.
+6. No guardar los eventos más allá de la ejecución, ni hacer escrituras en Google Calendar. Desconectar elimina el refresh token almacenado.
+
+**Criterio de salida:** OAuth con `state` no reutilizable, aislamiento por usuario, acceso de mínimo privilegio, rango/eventos acotados y un resultado de agente que el backend contrasta con la respuesta real de Google.
+
 ## Pruebas y guion de demo
 
 - Probar una delegación correcta, un resultado con formato inválido y un timeout. Un retorno tardío no cambia el estado final.
@@ -75,7 +91,7 @@ Los documentos y avisos son privados para su propietario. Pertenecer al hogar, i
 
 ## Fuera de alcance y paso a producción
 
-No construir frontend, integración real de calendario, envío de notificaciones, memoria de grafo ni registro público para el hackathon. El primer subagente de calendario será independiente y consultará un único proveedor en solo lectura.
+No construir frontend, envío de notificaciones, memoria de grafo ni registro público para el hackathon. La integración real de Calendar se mantiene acotada al agente especializado y al calendario principal en solo lectura.
 
 No usar DNI reales ni publicar el gateway. OpenClaw no debe servir como frontera de seguridad entre usuarios que no confían entre sí. Antes de un piloto, definir aislamiento de gateways, almacenamiento cifrado, borrado, retención y requisitos de protección de datos en España.
 

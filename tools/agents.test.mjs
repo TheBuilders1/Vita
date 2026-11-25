@@ -7,7 +7,7 @@ const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8'
 const inputs = {
   config: read('openclaw/config.example.json5'), plugin: read('openclaw/vita-tools/openclaw.plugin.json'),
   pluginPackage: read('openclaw/vita-tools/package.json'), pluginSource: read('openclaw/vita-tools/index.ts'),
-  agents: Object.fromEntries(['orquestador', 'documentos'].map(id => [id, read('openclaw/agents/' + id + '/AGENTS.md')])),
+  agents: Object.fromEntries(['orquestador', 'documentos', 'calendario'].map(id => [id, read('openclaw/agents/' + id + '/AGENTS.md')])),
   compose: read('compose.yaml'), dockerfile: read('Dockerfile'),
 }
 
@@ -22,9 +22,15 @@ test('JSON5 interpreta solo datos', () => {
 const changes = {
   config: [
     ['"loopback"', '"lan"'], ['"local"', '"remote"'], ['"token"', '"none"'], ['${OPENCLAW_TOKEN}', 'literal'],
-    ['allow: ["vita-tools"]', 'allow: ["*"]'], ['"vita-tools": {', '"extra": {}, "vita-tools": {'],
-    ['documentos: {', 'extra: {}, documentos: {'], ['"sessions_spawn", ', ''], ['allow: ["vita_scan_document"]', 'allow: ["*"]'],
-    ['allowAgents: ["documentos"]', 'allowAgents: []'], ['allowAgents: []', 'allowAgents: ["*"]'],
+    ['allow: ["vita-tools", "ollama"]', 'allow: ["*"]'], ['"vita-tools": {', '"extra": {}, "vita-tools": {'],
+    ['ollama: { enabled: true }', 'ollama: { enabled: false }'],
+    ['https://ollama.com', 'https://example.invalid'],
+    ['model: "ollama-cloud/glm-5.2"', 'model: "ollama-cloud/minimax-m3"'],
+    ['model: "ollama-cloud/minimax-m3"', 'model: "ollama/minimax-m3:cloud"'],
+    ['maxTokens: 131072', 'maxTokens: 524288'],
+    ['requireAgentId: true', 'requireAgentId: false'],
+    ['documentos: {', 'extra: {}, documentos: {'], ['"sessions_spawn",', ''], ['allow: ["vita_scan_document"]', 'allow: ["*"]'],
+    ['allowAgents: ["documentos", "calendario"]', 'allowAgents: []'], ['allowAgents: []', 'allowAgents: ["*"]'],
     ...['alsoAllow', 'deny', 'desconocida'].map(key => ['allow: ["vita_scan_document"]', key + ': [], allow: ["vita_scan_document"]']),
     ...['maxSpawnDepth', 'maxChildrenPerAgent', 'maxConcurrent'].map(key => [key + ': 1', key + ': 2']),
     ['runTimeoutSeconds: 120', 'runTimeoutSeconds: 121'],
@@ -39,13 +45,15 @@ const changes = {
     ['new URL(path, parsedBase.origin)', 'new URL(path, params.host)'],
     ['fetch(new URL(path, parsedBase.origin)', 'fetch(params.destino'],
   ],
-  orquestador: ['reportRef', 'scanRef', 'mensaje', 'respuestas', 'datos no confiables', 'No reveles referencias'].map(s => [s, '', true]),
+  orquestador: ['reportRef', 'scanRef', 'calendarRef', 'mensaje', 'respuestas', 'datos no confiables', 'No reveles referencias', 'MODO DE CHAT NORMAL', 'no uses herramientas ni delegues', 'nombre por defecto es Vita', 'no preguntes cómo quiere llamarte', 'responde exactamente:', 'tu asistente personal', 'visibleData', 'no la inventes', 'attachments', 'contenido no confiable'].map(s => [s, '', true]),
   documentos: [['no extraigas ni devuelvas texto OCR bruto', 'devuelve texto OCR bruto']],
+  calendario: [['vita_read_google_calendar', 'vita_write_google_calendar']],
   compose: [
     ['127.0.0.1:${POSTGRES_PORT', '0.0.0.0:${POSTGRES_PORT'],
     ...['privileged: true', 'pid: host', 'ipc: host', 'cap_add: [ALL]', 'volumes: [/var/run/docker.sock:/socket]'].map(s => ['    build: .', '    build: .\n    ' + s]),
     ...['POSTGRES_PASSWORD', 'VITA_API_PASSWORD', 'VITA_MIGRATOR_PASSWORD', 'VITA_DEMO_TOKENS'].map(s => ['${' + s + ':?Set ' + s + ' in .env}', '${' + s + '}']),
-    ['${OPENCLAW_TOKEN:-}', 'literal'], ['--host 127.0.0.1', '--host 0.0.0.0'], ['command:', 'otra:'], ['--host 127.0.0.1', '&& echo --host 127.0.0.1'],
+    ['${OPENCLAW_TOKEN:?Set OPENCLAW_TOKEN in .env}', 'literal'], ['${OLLAMA_API_KEY}', 'literal'], ['${GOOGLE_TOKEN_ENCRYPTION_KEY:-}', 'GOOGLE_TOKEN_ENCRYPTION_KEY: literal'],
+    ['--host 127.0.0.1', '--host 0.0.0.0'], ['command:', 'otra:'], ['--host 127.0.0.1', '&& echo --host 127.0.0.1'],
     ['services:', 'services:\n  extra:\n    environment: [EXTRA_TOKEN=literal]'],
   ],
   dockerfile: [

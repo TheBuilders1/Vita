@@ -155,7 +155,7 @@ describe('lo que no hace', () => {
   test.each(['borra la cita del dentista', 'elimina todo', 'cancela el dentista', 'cambia la cita al lunes', 'mueve la cita'])('%s: no cambia ni borra', (text) => expect(ask(text)).toMatchObject({ kind: 'text', text: expect.stringContaining('No cambio ni borro') }))
   test('«no apuntes» no apunta', () => expect(ask('no apuntes dentista mañana').kind).toBe('text'))
   test.each(['qué me tomo para la fiebre', 'puedo tomar ibuprofeno', 'me duele la cabeza, ¿qué hago?'])('%s: no da consejo médico', (text) => expect(ask(text)).toMatchObject({ kind: 'text', text: expect.stringContaining('consejo médico') }))
-  test.each(['', '   ', 'asdf qwer', '???'])('%j no se entiende y lo dice', (text) => expect(ask(text)).toMatchObject({ kind: 'text', text: expect.stringContaining('No te he entendido') }))
+  test.each(['', '   ', 'asdf qwer', '???'])('%j se deriva a conversación abierta', (text) => expect(ask(text).kind).toBe('assistant'))
 })
 
 describe('emergencias, antes que nada', () => {
@@ -210,7 +210,7 @@ describe('documentos y personas como fuente', () => {
   })
 })
 
-test.each(['hola', 'ayuda', '¿qué puedes hacer?'])('%s explica qué sabe hacer y que no es IA', (text) => expect(ask(text)).toMatchObject({ kind: 'text', text: expect.stringContaining('frases sencillas') }))
+test.each(['hola', 'ayuda', '¿qué puedes hacer?'])('%s se deriva al orquestador', (text) => expect(ask(text).kind).toBe('assistant'))
 
 describe('acciones y consultas nuevas', () => {
   test.each([

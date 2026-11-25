@@ -13,17 +13,31 @@
     },
   },
 
+  models: {
+    providers: {
+      "ollama-cloud": {
+        baseUrl: "https://ollama.com",
+        api: "ollama",
+        models: [
+          // El catálogo de OpenClaw 2026.11.8 anuncia más salida de la que acepta Ollama Cloud.
+          { id: "minimax-m3", name: "MiniMax M3", maxTokens: 131072 },
+        ],
+      },
+    },
+  },
+
   plugins: {
-    allow: ["vita-tools"],
+    allow: ["vita-tools", "ollama"],
     load: {
       paths: ["/absolute/path/to/Vita/openclaw/vita-tools"],
     },
     entries: {
       "vita-tools": { enabled: true },
+      ollama: { enabled: true },
     },
   },
 
-  // Cada agente tiene una o tres herramientas: sin buscador, el modelo las ve directamente.
+  // Cada agente tiene herramientas acotadas; sin buscador, el modelo las ve directamente.
   tools: { toolSearch: false },
 
   agents: {
@@ -40,17 +54,37 @@
     entries: {
       orquestador: {
         workspace: "/absolute/path/to/Vita/openclaw/agents/orquestador",
+        model: "ollama-cloud/glm-5.2",
         tools: {
-          // El hijo nunca tiene más de lo que permite esta lista: sin
-          // vita_scan_document aquí, «documentos» se queda sin herramientas.
-          allow: ["sessions_spawn", "sessions_yield", "vita_report_result", "vita_scan_document"],
+          // Los hijos heredan las herramientas de esta lista. El orquestador
+          // tiene ambas herramientas disponibles, pero sus instrucciones le
+          // prohíben llamarlas directamente.
+          allow: [
+            "sessions_spawn",
+            "sessions_yield",
+            "vita_report_result",
+            "vita_scan_document",
+            "vita_read_google_calendar",
+          ],
         },
         subagents: {
-          allowAgents: ["documentos"],
+          allowAgents: ["documentos", "calendario"],
+          requireAgentId: true,
+        },
+      },
+      calendario: {
+        workspace: "/absolute/path/to/Vita/openclaw/agents/calendario",
+        model: "ollama-cloud/minimax-m3",
+        tools: {
+          allow: ["vita_read_google_calendar"],
+        },
+        subagents: {
+          allowAgents: [],
         },
       },
       documentos: {
         workspace: "/absolute/path/to/Vita/openclaw/agents/documentos",
+        model: "ollama-cloud/minimax-m3",
         tools: {
           allow: ["vita_scan_document"],
         },

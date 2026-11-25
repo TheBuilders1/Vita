@@ -32,10 +32,14 @@ services:
       VITA_MAX_UPLOAD_BYTES: ${VITA_MAX_UPLOAD_BYTES:-10485760}
       VITA_MAX_IMAGE_DIMENSION: ${VITA_MAX_IMAGE_DIMENSION:-8000}
       VITA_MAX_IMAGE_PIXELS: ${VITA_MAX_IMAGE_PIXELS:-20000000}
-      OPENCLAW_BASE_URL: ${OPENCLAW_BASE_URL:-http://127.0.0.1:18789/v1}
-      OPENCLAW_TOKEN: ${OPENCLAW_TOKEN:-}
+      OPENCLAW_BASE_URL: ${OPENCLAW_BASE_URL:-http://127.0.0.1:${OPENCLAW_GATEWAY_PORT:-18789}/v1}
+      OPENCLAW_TOKEN: ${OPENCLAW_TOKEN:?Set OPENCLAW_TOKEN in .env}
       OPENCLAW_AGENT_ID: ${OPENCLAW_AGENT_ID:-orquestador}
       OPENCLAW_TIMEOUT_SECONDS: ${OPENCLAW_TIMEOUT_SECONDS:-120}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI:-}
+      GOOGLE_TOKEN_ENCRYPTION_KEY: ${GOOGLE_TOKEN_ENCRYPTION_KEY:-}
     volumes:
       - vita-files:/data/private
     command:
@@ -44,7 +48,82 @@ services:
         "-c",
         "python -m app.migrate && uvicorn app.main:app --host 127.0.0.1 --port 8000",
       ]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  openclaw:
+    build:
+      context: .
+      dockerfile: openclaw/Dockerfile
+    network_mode: host
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      OPENCLAW_TOKEN: ${OPENCLAW_TOKEN:?Set OPENCLAW_TOKEN in .env}
+      OPENCLAW_GATEWAY_PORT: ${OPENCLAW_GATEWAY_PORT:-18790}
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY}
+      VITA_API_URL: http://127.0.0.1:8000
+      NODE_OPTIONS: --max-old-space-size=1024
+    volumes:
+      - openclaw-data:/home/openclaw/.openclaw-vita-demo
+    # Comparte la red del equipo: el arranque obliga al Gateway a escuchar solo en loopback.
+    command: ["--host", "127.0.0.1"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "/opt/openclaw/node_modules/openclaw/openclaw.mjs",
+          "--profile",
+          "vita-demo",
+          "health",
+          "--json",
+          "--timeout",
+          "10000",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    network_mode: host
+    depends_on:
+      api:
+        condition: service_healthy
+      openclaw:
+        condition: service_healthy
+    env_file:
+      - path: ./frontend/.env.local
+        required: false
+    environment:
+      VITA_API_URL: ${VITA_API_URL:-http://127.0.0.1:8000}
+    command:
+      [
+        "pnpm",
+        "dev",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "${FRONTEND_PORT:-5174}",
+        "--strictPort",
+      ]
 
 volumes:
   postgres-data:
   vita-files:
+  openclaw-data:

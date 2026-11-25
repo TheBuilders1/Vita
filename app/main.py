@@ -17,19 +17,34 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     Request,
     UploadFile,
     status,
 )
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import ValidationError
 
+from app.chat_attachments import ChatAttachmentError, extract_chat_attachment
 from app.config import Settings
 from app.database import connect, recover_interrupted_runs
+from app.google_calendar import (
+    CalendarIntegrationError,
+    authorization_url,
+    decrypt_oauth_secret,
+    encrypt_oauth_secret,
+    encrypt_refresh_token,
+    exchange_authorization_code,
+    list_calendar_events,
+)
 from app.images import ImageRejected, inspect_image
 from app.ocr import OcrUnavailable, TesseractOCR
-from app.openclaw import OpenClawClient
+from app.openclaw import GatewayError, GatewayTimeout, OpenClawClient
 from app.reminders import ReminderInPast, scheduled_reminder_at
 from app.schemas import (
+    ChatRequest,
+    ChatAttachmentText,
+    ChatResponse,
     ConfirmationAccepted,
     ConfirmBody,
     CreateRunBody,
@@ -43,15 +58,18 @@ from app.worker import (
     RunDispatcher,
     RunSignals,
     claim_scan,
+    consume_calendar_ref,
     dispatch_run,
+    fail_calendar_run,
     fail_invalid_report,
     finish_if_active,
     report_result,
+    store_calendar_result,
     store_scan_result,
 )
 
 logger = logging.getLogger(__name__)
-REPORT_BODY_LIMIT = 8192
+REPORT_BODY_LIMIT = 65_536
 
 
 def _save_private_file(root: Path, data: bytes, extension: str) -> tuple[str, Path]:
@@ -112,11 +130,250 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.state.openclaw_client = OpenClawClient(config)
     api.state.ocr = TesseractOCR()
 
+    @api.post("/v1/calendar/connect")
+    def connect_google_calendar(
+        request: Request,
+        user_id: UUID = Depends(authenticated_user),
+    ) -> dict[str, str | int]:
+        settings = request.app.state.settings
+        try:
+            url, state, code_verifier, nonce = authorization_url(settings)
+        except CalendarIntegrationError as exc:
+            raise HTTPException(status_code=503, detail=exc.code) from exc
+
+        with request.app.state.connect() as conn:
+            conn.execute(
+                "DELETE FROM producto.google_oauth_states WHERE expires_at <= now()"
+            )
+            pending_oauth = conn.execute(
+                """
+                SELECT count(*) AS count
+                FROM producto.google_oauth_states
+                WHERE owner_user_id = %s AND expires_at > now()
+                """,
+                (user_id,),
+            ).fetchone()
+            if pending_oauth["count"] >= 5:
+                raise HTTPException(status_code=429, detail="too_many_google_oauth_requests")
+            encrypted_verifier = encrypt_oauth_secret(settings, code_verifier)
+            conn.execute(
+                """
+                INSERT INTO producto.google_oauth_states (
+                    state_hash, owner_user_id, code_verifier_ciphertext,
+                    nonce_ciphertext, expires_at
+                )
+                VALUES (%s, %s, %s, %s, now() + interval '10 minutes')
+                """,
+                (
+                    token_digest(state),
+                    user_id,
+                    encrypted_verifier,
+                    encrypt_oauth_secret(settings, nonce),
+                ),
+            )
+        return {"authorizationUrl": url, "expiresIn": 600}
+
+    @api.get("/v1/calendar/oauth/callback", include_in_schema=False)
+    def google_calendar_oauth_callback(
+        request: Request,
+        state: str,
+        code: str | None = Query(default=None, max_length=2048),
+        error: str | None = Query(default=None, max_length=256),
+    ) -> RedirectResponse:
+        if (
+            len(state) < 32
+            or len(state) > 256
+            or not state.isascii()
+            or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for char in state)
+        ):
+            raise HTTPException(status_code=400, detail="invalid_oauth_state")
+
+        with request.app.state.connect() as conn:
+            oauth_state = conn.execute(
+                """
+                DELETE FROM producto.google_oauth_states
+                WHERE state_hash = %s AND expires_at > now()
+                RETURNING owner_user_id, code_verifier_ciphertext, nonce_ciphertext
+                """,
+                (token_digest(state),),
+            ).fetchone()
+        if not oauth_state:
+            raise HTTPException(status_code=400, detail="invalid_or_expired_oauth_state")
+        if error or not code:
+            raise HTTPException(status_code=400, detail="google_calendar_authorization_denied")
+
+        settings = request.app.state.settings
+        try:
+            refresh_token, google_subject = exchange_authorization_code(
+                settings,
+                code,
+                state,
+                decrypt_oauth_secret(settings, oauth_state["code_verifier_ciphertext"]),
+                decrypt_oauth_secret(settings, oauth_state["nonce_ciphertext"]),
+            )
+        except CalendarIntegrationError as exc:
+            raise HTTPException(status_code=400, detail=exc.code) from exc
+        if not refresh_token:
+            with request.app.state.connect() as conn:
+                existing = conn.execute(
+                    """
+                    SELECT google_subject
+                    FROM producto.google_calendar_connections
+                    WHERE owner_user_id = %s
+                    """,
+                    (oauth_state["owner_user_id"],),
+                ).fetchone()
+            if not existing:
+                raise HTTPException(
+                    status_code=400,
+                    detail="google_calendar_refresh_token_missing",
+                )
+            if existing["google_subject"] != google_subject:
+                raise HTTPException(
+                    status_code=409,
+                    detail="google_calendar_account_mismatch",
+                )
+
+        owner_user_id = oauth_state["owner_user_id"]
+        if refresh_token:
+            encrypted = encrypt_refresh_token(settings, refresh_token)
+            with request.app.state.connect() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO producto.google_calendar_connections (
+                        owner_user_id, google_subject, refresh_token_ciphertext
+                    )
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (owner_user_id) DO UPDATE
+                    SET google_subject = EXCLUDED.google_subject,
+                        refresh_token_ciphertext = EXCLUDED.refresh_token_ciphertext,
+                        updated_at = now()
+                    """,
+                    (owner_user_id, google_subject, encrypted),
+                )
+        return RedirectResponse(url="/v1/calendar/oauth/complete", status_code=303)
+
+    @api.get(
+        "/v1/calendar/oauth/complete",
+        include_in_schema=False,
+        response_class=HTMLResponse,
+    )
+    def google_calendar_oauth_complete() -> str:
+        return (
+            "<!doctype html><html lang='es'><meta charset='utf-8'>"
+            "<title>Google Calendar conectado</title>"
+            "<body><p>Google Calendar quedó conectado. Ya puedes cerrar esta ventana.</p>"
+            "</body></html>"
+        )
+
+    @api.get("/v1/calendar/status")
+    def google_calendar_status(
+        request: Request,
+        user_id: UUID = Depends(authenticated_user),
+    ) -> dict[str, bool]:
+        with request.app.state.connect() as conn:
+            connection = conn.execute(
+                """
+                SELECT 1
+                FROM producto.google_calendar_connections
+                WHERE owner_user_id = %s
+                """,
+                (user_id,),
+            ).fetchone()
+        return {"connected": connection is not None}
+
+    @api.delete("/v1/calendar/connection")
+    def disconnect_google_calendar(
+        request: Request,
+        user_id: UUID = Depends(authenticated_user),
+    ) -> dict[str, bool]:
+        with request.app.state.connect() as conn:
+            conn.execute(
+                """
+                DELETE FROM producto.google_calendar_connections
+                WHERE owner_user_id = %s
+                """,
+                (user_id,),
+            )
+            conn.execute(
+                """
+                DELETE FROM producto.google_oauth_states
+                WHERE owner_user_id = %s
+                """,
+                (user_id,),
+            )
+            cancelled_runs = conn.execute(
+                """
+                UPDATE producto.runs
+                SET status = 'failed',
+                    error_code = 'calendar_disconnected',
+                    finished_at = now(),
+                    report_ref_hash = NULL,
+                    scan_ref_hash = NULL,
+                    calendar_ref_hash = NULL
+                WHERE owner_user_id = %s
+                  AND status IN ('queued', 'running')
+                  AND calendar_start_date IS NOT NULL
+                RETURNING id
+                """,
+                (user_id,),
+            ).fetchall()
+        for cancelled_run in cancelled_runs:
+            request.app.state.signals.notify(cancelled_run["id"])
+        return {"connected": False}
+
     @api.get("/healthz", include_in_schema=False)
     def healthz(request: Request) -> dict[str, str]:
         with request.app.state.connect() as conn:
             conn.execute("SELECT 1")
         return {"status": "ok"}
+
+    @api.post("/v1/chat/attachments", response_model=ChatAttachmentText)
+    def extract_chat_attachment_route(
+        request: Request,
+        file: UploadFile = File(...),
+        _user_id: UUID = Depends(authenticated_user),
+    ) -> ChatAttachmentText:
+        settings = request.app.state.settings
+        data = file.file.read(settings.max_upload_bytes + 1)
+        try:
+            text = extract_chat_attachment(
+                data,
+                file.filename,
+                file.content_type,
+                settings,
+                request.app.state.ocr,
+            )
+        except ChatAttachmentError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.code) from exc
+        return ChatAttachmentText(text=text)
+
+    @api.post("/v1/chat", response_model=ChatResponse)
+    def chat(
+        body: ChatRequest,
+        request: Request,
+        user_id: UUID = Depends(authenticated_user),
+    ) -> ChatResponse:
+        try:
+            message = request.app.state.openclaw_client.chat(
+                f"vita:{user_id}:{body.conversation_id}",
+                body.message,
+                [item.model_dump() for item in body.context],
+                [item.text for item in body.attachments],
+            )
+        except GatewayTimeout as exc:
+            raise HTTPException(status_code=504, detail="assistant_timeout") from exc
+        except GatewayError as exc:
+            status_code = (
+                503
+                if exc.code in {"gateway_not_configured", "gateway_unavailable"}
+                else 502
+            )
+            raise HTTPException(
+                status_code=status_code,
+                detail="assistant_unavailable",
+            ) from exc
+        return ChatResponse(message=message)
 
     @api.post(
         "/v1/documents",
@@ -208,6 +465,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         session_key = f"agent:{settings.openclaw_agent_id}:vita:run:{run_id}"
         report_ref = secrets.token_urlsafe(32)
         scan_ref = secrets.token_urlsafe(32) if body.document_id else None
+        calendar_ref = secrets.token_urlsafe(32) if body.calendar else None
         deadline = datetime.now(timezone.utc) + timedelta(
             seconds=settings.openclaw_timeout_seconds
         )
@@ -238,13 +496,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 if not document:
                     raise HTTPException(status_code=404, detail="document_not_found")
 
+            if body.calendar:
+                if not settings.google_calendar_enabled:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="google_calendar_not_configured",
+                    )
+                connection = conn.execute(
+                    """
+                    SELECT 1
+                    FROM producto.google_calendar_connections
+                    WHERE owner_user_id = %s
+                    """,
+                    (user_id,),
+                ).fetchone()
+                if not connection:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="google_calendar_not_connected",
+                    )
             conn.execute(
                 """
                 INSERT INTO producto.runs (
                     id, household_id, owner_user_id, document_id, status,
-                    deadline_at, openclaw_session_key, report_ref_hash, scan_ref_hash
+                    deadline_at, openclaw_session_key, report_ref_hash, scan_ref_hash,
+                    calendar_ref_hash, calendar_start_date, calendar_end_date
                 )
-                VALUES (%s, %s, %s, %s, 'queued', %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, 'queued', %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     run_id,
@@ -255,6 +533,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     session_key,
                     token_digest(report_ref),
                     token_digest(scan_ref) if scan_ref else None,
+                    token_digest(calendar_ref) if calendar_ref else None,
+                    body.calendar.start_date if body.calendar else None,
+                    body.calendar.end_date if body.calendar else None,
                 ),
             )
 
@@ -268,6 +549,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 body.message,
                 report_ref,
                 scan_ref,
+                calendar_ref,
             )
         )
         return RunAccepted(runId=run_id, status="queued")
@@ -501,6 +783,76 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         if not store_scan_result(request.app, claim["id"], result):
             finish_if_active(request.app, claim["id"], "timed_out", "scan_timeout")
+            raise HTTPException(status_code=410, detail="run_no_longer_active")
+        return result
+
+    @api.post("/v1/internal/calendar/read", include_in_schema=False)
+    def internal_read_calendar(request: Request) -> dict:
+        calendar_ref = bearer_token(request)
+        claim = consume_calendar_ref(request.app, calendar_ref)
+        if isinstance(claim, str):
+            if claim == "used":
+                raise HTTPException(status_code=409, detail="calendar_read_already_used")
+            if claim == "expired":
+                with request.app.state.connect() as conn:
+                    conn.execute(
+                        "SELECT pg_notify('vita_run_finished', %s)",
+                        ("calendar_expired",),
+                    )
+                raise HTTPException(status_code=410, detail="reference_expired")
+            if claim == "final":
+                raise HTTPException(status_code=409, detail="run_already_final")
+            raise HTTPException(status_code=404, detail="reference_not_found")
+        if "cached_result" in claim:
+            return claim["cached_result"]
+
+        try:
+            result = list_calendar_events(
+                request.app.state.settings,
+                claim["refresh_token_ciphertext"],
+                claim["calendar_start_date"],
+                claim["calendar_end_date"],
+                claim["timezone"],
+            )
+        except CalendarIntegrationError as exc:
+            if exc.code in {
+                "google_calendar_authorization_failed",
+                "google_calendar_api_error",
+            }:
+                with request.app.state.connect() as conn:
+                    conn.execute(
+                        """
+                        DELETE FROM producto.google_calendar_connections
+                        WHERE owner_user_id = %s
+                        """,
+                        (claim["owner_user_id"],),
+                    )
+            if exc.code == "google_calendar_timeout":
+                fail_calendar_run(request.app, claim["id"], "calendar_timeout")
+            elif exc.code == "google_calendar_api_error":
+                fail_calendar_run(request.app, claim["id"], "calendar_api_error")
+            elif exc.code == "calendar_timezone_mismatch":
+                fail_calendar_run(request.app, claim["id"], "invalid_calendar_response")
+            elif exc.code in {
+                "google_calendar_authorization_failed",
+                "google_calendar_unavailable",
+                "invalid_calendar_response",
+                "invalid_calendar_window",
+                "invalid_household_timezone",
+                "google_calendar_credentials_unavailable",
+            }:
+                fail_calendar_run(request.app, claim["id"], exc.code)
+            status_code = 504 if exc.code == "google_calendar_timeout" else 502
+            if exc.code in {
+                "google_calendar_not_configured",
+                "google_calendar_credentials_unavailable",
+            }:
+                status_code = 503
+            elif exc.code == "invalid_household_timezone":
+                status_code = 500
+            raise HTTPException(status_code=status_code, detail=exc.code) from exc
+
+        if not store_calendar_result(request.app, claim["id"], result):
             raise HTTPException(status_code=410, detail="run_no_longer_active")
         return result
 

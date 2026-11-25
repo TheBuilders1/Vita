@@ -42,6 +42,7 @@ export interface AgendaScope {
 }
 
 export type Reply =
+  | { readonly kind: 'assistant'; readonly text: string }
   | { readonly kind: 'text'; readonly text: string; readonly link?: ChatLink }
   | { readonly kind: 'agenda'; readonly scope?: AgendaScope; readonly text: string; readonly items: readonly AgendaMatch[]; readonly remaining: readonly AgendaMatch[] }
   | { readonly kind: 'proposals'; readonly text: string; readonly proposals: readonly Proposal[] }

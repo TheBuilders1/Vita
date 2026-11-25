@@ -23,7 +23,7 @@ export interface RecordInput {
   /** `updatedAt` de lo que se tenía delante: si ya es otro, no se guarda. */
   ifUnchanged?: string
 }
-export type RecordChanges = Partial<Omit<RecordInput, 'typeId' | 'copyOf'>> 
+export type RecordChanges = Partial<Omit<RecordInput, 'typeId' | 'copyOf'>>
 export type RecordFilter = { typeId: string } | { moduleId: ModuleId }
 
 const GONE = 'Ese registro ya no existe'
