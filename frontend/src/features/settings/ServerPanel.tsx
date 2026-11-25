@@ -21,7 +21,7 @@ export function ServerPanel() {
       <Panel title="Vita conectada">
         <Checkbox label="Consultar al asistente del servidor" checked={connected} onChange={e => {
           settingsStore.getState().update({ connectedChat: e.target.checked }).then(() => toastStore.getState().show('Preferencia guardada')).catch((cause: unknown) => toastStore.getState().show(describeError(cause), 'error'))
-        }} help="Solo si Vita no entiende tu mensaje, enviará lo que escribas, tu nombre e identificador, los nombres e identificadores de las personas del hogar, la fecha, la zona horaria, la pantalla de origen y hasta seis intercambios anteriores con el servidor. Evita escribir datos privados. Las consultas resueltas en el dispositivo y las fichas del hogar se quedan aquí." />
+        }} help="Si Vita no entiende tu mensaje, enviará la pregunta y los datos visibles necesarios al servidor; OpenClaw puede conservar texto de la conversación. Los adjuntos se leen en el servidor, pero solo si marcas análisis visual una imagen puede enviarse a Ollama Cloud. Evita incluir datos privados." />
       </Panel>
     </>
   )

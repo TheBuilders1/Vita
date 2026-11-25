@@ -131,7 +131,10 @@ def _webp_png(data: bytes, settings: Settings) -> bytes:
                 image.load()
                 output = BytesIO()
                 image.convert("RGB").save(output, format="PNG")
-                return output.getvalue()
+                result = output.getvalue()
+                if len(result) > settings.max_upload_bytes:
+                    raise ChatAttachmentError("attachment_too_large", 413)
+                return result
     except ChatAttachmentError:
         raise
     except (
@@ -144,9 +147,47 @@ def _webp_png(data: bytes, settings: Settings) -> bytes:
         raise ChatAttachmentError("invalid_attachment") from exc
 
 
-def _clean_text(text: str) -> str:
+def _sniff_image_mime(data: bytes) -> str | None:
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def prepare_vision_image(
+    data: bytes,
+    content_type: str | None,
+    settings: Settings,
+) -> tuple[bytes, str]:
+    if not data:
+        raise ChatAttachmentError("empty_attachment")
+    if len(data) > settings.max_upload_bytes:
+        raise ChatAttachmentError("attachment_too_large", 413)
+
+    mime = _sniff_image_mime(data) or content_type or ""
+    try:
+        if mime in {"image/jpeg", "image/png"}:
+            inspect_image(
+                data,
+                mime,
+                settings.max_upload_bytes,
+                settings.max_image_dimension,
+                settings.max_image_pixels,
+            )
+            return data, mime
+        if mime == "image/webp":
+            return _webp_png(data, settings), "image/png"
+    except ImageRejected as exc:
+        raise ChatAttachmentError(exc.code, exc.status_code) from exc
+    raise ChatAttachmentError("unsupported_attachment_type", 415)
+
+
+def _clean_text(text: str, *, allow_empty: bool = False) -> str:
     text = text.replace("\x00", "").strip()
-    if not text:
+    if not text and not allow_empty:
         raise ChatAttachmentError("no_text_found")
     return text[:MAX_ATTACHMENT_TEXT]
 
@@ -164,14 +205,7 @@ def extract_chat_attachment(
         raise ChatAttachmentError("attachment_too_large", 413)
 
     suffix = Path(filename or "").suffix.lower()
-    if data.startswith(b"\xff\xd8\xff"):
-        mime = "image/jpeg"
-    elif data.startswith(b"\x89PNG\r\n\x1a\n"):
-        mime = "image/png"
-    elif data.startswith(b"RIFF") and data[8:12] == b"WEBP":
-        mime = "image/webp"
-    else:
-        mime = content_type or ""
+    mime = _sniff_image_mime(data) or content_type or ""
 
     try:
         if mime in {"image/jpeg", "image/png"}:
@@ -204,4 +238,4 @@ def extract_chat_attachment(
     except OcrUnavailable as exc:
         raise ChatAttachmentError("attachment_reader_unavailable", 503) from exc
 
-    return _clean_text(text)
+    return _clean_text(text, allow_empty=mime in {"image/jpeg", "image/png", "image/webp"})

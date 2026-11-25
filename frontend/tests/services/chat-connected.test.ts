@@ -1,12 +1,12 @@
 import { afterEach, expect, test, vi } from 'vitest'
-import { respond, followUps } from '@/services/chat/connected'
-import { UNKNOWN, type ChatContext } from '@/services/chat'
+import { assistantTimeoutMs, respond, followUps } from '@/services/chat/connected'
+import { UNKNOWN, type ChatAssistantAttachment, type ChatContext } from '@/services/chat'
 import { buildMember, buildRecord } from '../support/builders'
 
 const actor = buildMember('ana', 'master', { name: 'Ana' })
 const dni = buildRecord({ id: 'dni', moduleId: 'documents', typeId: 'document', data: { kind: 'id', title: 'DNI de Ana', member: 'ana', expiryDate: '2030-12-31' } })
 const context: ChatContext = { actor, members: [actor], records: [dni], enabled: ['planner', 'documents'], today: '2026-11-25', emergencyNumber: '112', canReadPhotos: false }
-const remote = (connected = true, household: string | null = 'hogar', attachments: File[] = []) =>
+const remote = (connected = true, household: string | null = 'hogar', attachments: ChatAssistantAttachment[] = []) =>
   ({ connected, household, conversationId: 'c'.repeat(32), attachments, signal: new AbortController().signal })
 const ask = (message = 'Organiza mi día', options = remote()) => respond(message, context, options)
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
@@ -33,7 +33,7 @@ test('lo que no entiende va al asistente con el hilo y sin datos del hogar', asy
   const request = vi.fn().mockResolvedValue(Response.json({ message: 'Te ayudo a organizarlo.' }))
   vi.stubGlobal('fetch', request)
   expect(await ask()).toEqual({ reply: { kind: 'assistant', text: 'Te ayudo a organizarlo.' }, details: undefined, remote: true })
-  expect(JSON.parse(request.mock.calls[0]![1].body)).toEqual({ message: 'Organiza mi día', conversationId: 'c'.repeat(32), context: [], attachments: [] })
+  expect(JSON.parse(request.mock.calls[0]![1].body)).toEqual({ message: 'Organiza mi día', conversationId: 'c'.repeat(32), context: [], attachments: [], visionRefs: [] })
 })
 
 test('una consulta del hogar manda solo los datos visibles y conserva la ficha', async () => {
@@ -58,6 +58,11 @@ test('corta la espera a los veinte segundos', async () => {
   const result = ask()
   await vi.advanceTimersByTimeAsync(20_000)
   expect((await result).reply.text).toContain('ha tardado demasiado')
+})
+
+test('reserva más tiempo para el subagente visual autorizado', () => {
+  expect(assistantTimeoutMs([])).toBe(20_000)
+  expect(assistantTimeoutMs([{ file: new File(['image'], 'foto.png', { type: 'image/png' }), analyzeVisually: true }])).toBe(110_000)
 })
 
 test('da seguimiento según la respuesta y reconoce ambas preguntas de agenda', () => {

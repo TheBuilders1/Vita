@@ -9,7 +9,9 @@ RUN useradd --create-home --uid 10001 openclaw \
 
 COPY openclaw/vita-tools/package.json /opt/openclaw/plugins/vita-tools/package.json
 COPY openclaw/vita-tools/index.ts /opt/openclaw/plugins/vita-tools/index.ts
+COPY openclaw/vita-tools/vision.mjs /opt/openclaw/plugins/vita-tools/vision.mjs
 COPY openclaw/vita-tools/openclaw.plugin.json /opt/openclaw/plugins/vita-tools/openclaw.plugin.json
+COPY openclaw/merge-vita-config.mjs /usr/local/lib/openclaw/merge-vita-config.mjs
 COPY openclaw/docker-entrypoint.sh /usr/local/bin/openclaw-entrypoint
 COPY openclaw/config.compose.json /opt/openclaw/config.compose.json
 COPY --chown=openclaw:openclaw openclaw/agents /opt/openclaw/agents

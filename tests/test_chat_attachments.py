@@ -6,7 +6,7 @@ from zipfile import ZipFile
 import pytest
 from PIL import Image
 
-from app.chat_attachments import ChatAttachmentError, extract_chat_attachment
+from app.chat_attachments import ChatAttachmentError, extract_chat_attachment, prepare_vision_image
 from app.config import Settings
 from app.ocr import OcrUnavailable
 
@@ -57,6 +57,22 @@ def test_converts_webp_to_png_for_local_ocr() -> None:
             return "Texto del WebP"
 
     assert extract_chat_attachment(webp_bytes(), "foto.webp", "image/webp", settings(), PngOcr()) == "Texto del WebP"
+
+
+def test_image_without_ocr_text_is_an_empty_result_for_optional_vision() -> None:
+    class EmptyOcr:
+        def read_text(self, _data: bytes) -> str:
+            return " \n "
+
+    assert extract_chat_attachment(png_bytes(), "foto.png", "image/png", settings(), EmptyOcr()) == ""
+
+
+def test_visual_upload_validation_normalizes_webp_and_rejects_other_images() -> None:
+    data, mime_type = prepare_vision_image(webp_bytes(), "image/webp", settings())
+    assert mime_type == "image/png"
+    assert data.startswith(b"\x89PNG\r\n\x1a\n")
+    with pytest.raises(ChatAttachmentError, match="unsupported_attachment_type"):
+        prepare_vision_image(b"GIF89a", "image/gif", settings())
 
 
 def test_extracts_pdf_text_and_uses_local_ocr_for_scanned_pages(monkeypatch: pytest.MonkeyPatch) -> None:

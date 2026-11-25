@@ -1,12 +1,16 @@
 import * as z from '@/utils/zod'
 import { describeError } from '@/services/errors'
 import type { AssistantDetails } from '@/store/chatStore'
-import { askOrchestrator, assistantContext, shouldUseAssistant } from './assistant'
+import { askOrchestrator, assistantContext, shouldUseAssistant, type ChatAssistantAttachment } from './assistant'
 import { answer, type ChatContext, type Reply } from './index'
 
 export const proposalType = z.enum(['task', 'event', 'appointment', 'dentalVisit', 'shoppingItem', 'shoppingList'])
 interface Result { reply: Reply; details?: AssistantDetails; remote: boolean }
-interface Remote { readonly connected: boolean; readonly household: string | null; readonly conversationId: string; readonly attachments?: readonly File[]; readonly signal: AbortSignal }
+interface Remote { readonly connected: boolean; readonly household: string | null; readonly conversationId: string; readonly attachments?: readonly ChatAssistantAttachment[]; readonly signal: AbortSignal }
+
+export function assistantTimeoutMs(attachments: readonly ChatAssistantAttachment[]): number {
+  return attachments.some(({ analyzeVisually }) => analyzeVisually) ? 110_000 : 20_000
+}
 
 /** Primero el dispositivo. Solo con servidor y permiso, el asistente del hogar redacta lo que aquí no se entiende o lo que se adjunta. */
 export function respond(message: string, context: ChatContext, { connected, household, conversationId, attachments = [], signal }: Remote): Result | Promise<Result> {
@@ -17,7 +21,7 @@ export function respond(message: string, context: ChatContext, { connected, hous
 
   async function consult(): Promise<Result> {
     const timer = new AbortController()
-    const timeout = setTimeout(() => timer.abort(), 20_000)
+    const timeout = setTimeout(() => timer.abort(), assistantTimeoutMs(attachments))
     const both = AbortSignal.any([signal, timer.signal])
     try {
       const text = await askOrchestrator({ message, conversationId, context: assistantContext(reply), attachments, fetch: (url, init) => fetch(url, { ...init, signal: both }) })

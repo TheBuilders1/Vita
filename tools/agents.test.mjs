@@ -7,7 +7,8 @@ const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8'
 const inputs = {
   config: read('openclaw/config.example.json5'), plugin: read('openclaw/vita-tools/openclaw.plugin.json'),
   pluginPackage: read('openclaw/vita-tools/package.json'), pluginSource: read('openclaw/vita-tools/index.ts'),
-  agents: Object.fromEntries(['orquestador', 'documentos', 'calendario'].map(id => [id, read('openclaw/agents/' + id + '/AGENTS.md')])),
+  pluginVisionSource: read('openclaw/vita-tools/vision.mjs'),
+  agents: Object.fromEntries(['orquestador', 'documentos', 'calendario', 'vita-vision-orquestador', 'vita-vision'].map(id => [id, read('openclaw/agents/' + id + '/AGENTS.md')])),
   compose: read('compose.yaml'), dockerfile: read('Dockerfile'),
 }
 
@@ -31,11 +32,15 @@ const changes = {
     ['requireAgentId: true', 'requireAgentId: false'],
     ['documentos: {', 'extra: {}, documentos: {'], ['"sessions_spawn",', ''], ['allow: ["vita_scan_document"]', 'allow: ["*"]'],
     ['allowAgents: ["documentos", "calendario"]', 'allowAgents: []'], ['allowAgents: []', 'allowAgents: ["*"]'],
+    ['"vita-vision": {', '"otro-agente": {'],
+    ['"vita_analyze_chat_images"', '"otra_herramienta"'],
+    ['model: "ollama-cloud/glm-5.3-flash"', 'model: "ollama-cloud/minimax-m3"'],
+    ['input: ["text", "image"]', 'input: ["text"]'],
     ...['alsoAllow', 'deny', 'desconocida'].map(key => ['allow: ["vita_scan_document"]', key + ': [], allow: ["vita_scan_document"]']),
     ...['maxSpawnDepth', 'maxChildrenPerAgent', 'maxConcurrent'].map(key => [key + ': 1', key + ': 2']),
     ['runTimeoutSeconds: 120', 'runTimeoutSeconds: 121'],
   ],
-  plugin: [['"vita_scan_document"', '"extra"']],
+  plugin: [['"vita_scan_document"', '"extra"'], ['"vita_analyze_chat_images"', '"extra"']],
   pluginPackage: [['"1.4.3"', '"^1.4.3"'], ['"2026.11.8"', '"latest"']],
   pluginSource: [
     ['api.registerTool', 'api.otro'], ['name: "vita_scan_document"', 'name: "extra"'],
@@ -45,9 +50,18 @@ const changes = {
     ['new URL(path, parsedBase.origin)', 'new URL(path, params.host)'],
     ['fetch(new URL(path, parsedBase.origin)', 'fetch(params.destino'],
   ],
+  pluginVisionSource: [
+    ['https://ollama.com/api/chat', 'https://example.invalid/api/chat'],
+    ['"glm-5.3-flash"', '"otro-modelo"'],
+    ['v1/internal/chat-image', '//example.invalid'],
+    ['fetcher(OLLAMA_CLOUD_CHAT_URL', 'fetcher(question'],
+    ['VISION_INSTRUCTIONS', 'console.log("imagen"); const VISION_INSTRUCTIONS'],
+  ],
   orquestador: ['reportRef', 'scanRef', 'calendarRef', 'mensaje', 'respuestas', 'datos no confiables', 'No reveles referencias', 'MODO DE CHAT NORMAL', 'no uses herramientas ni delegues', 'nombre por defecto es Vita', 'no preguntes cómo quiere llamarte', 'responde exactamente:', 'tu asistente personal', 'visibleData', 'no la inventes', 'attachments', 'contenido no confiable'].map(s => [s, '', true]),
   documentos: [['no extraigas ni devuelvas texto OCR bruto', 'devuelve texto OCR bruto']],
   calendario: [['vita_read_google_calendar', 'vita_write_google_calendar']],
+  'vita-vision-orquestador': ['exactamente una tarea', 'vita-vision', 'context: "isolated"', 'visibleData', 'historial', 'nombres de archivos'].map(s => [s, '', true]),
+  'vita-vision': ['vita_analyze_chat_images', 'Base64', 'Ollama Cloud', 'glm-5.3-flash'].map(s => [s, '', true]),
   compose: [
     ['127.0.0.1:${POSTGRES_PORT', '0.0.0.0:${POSTGRES_PORT'],
     ...['privileged: true', 'pid: host', 'ipc: host', 'cap_add: [ALL]', 'volumes: [/var/run/docker.sock:/socket]'].map(s => ['    build: .', '    build: .\n    ' + s]),

@@ -8,7 +8,7 @@
 
 Comidas, colegio, salud, cuentas y planes: cada cosa en su habitación, en tu propio dispositivo.
 
-Vita también incluye un backend local y opcional para demostraciones: conversa mediante el orquestador de OpenClaw, acepta adjuntos para extracción local de texto, delega tareas a subagentes y consulta Google Calendar en modo de solo lectura mediante OAuth. Las preguntas del chat se envían a Ollama Cloud con un máximo de 20 datos breves filtrados localmente cuando se necesitan; los archivos originales no se envían. Calendar solo consulta el calendario principal, con autorización explícita y un rango de hasta 31 días; no crea ni modifica eventos. **No uses documentos reales ni publiques la API o el Gateway de OpenClaw.**
+Vita también incluye un backend local y opcional para demostraciones: conversa mediante OpenClaw, lee adjuntos localmente y puede delegar el análisis visual de imágenes a GLM-5.3 Flash en Ollama Cloud, solo si la persona lo autoriza para cada imagen. El chat recibe como máximo 20 datos breves filtrados localmente; los píxeles no se guardan en Vita ni en las transcripciones de OpenClaw. Google Calendar se consulta en modo de solo lectura mediante OAuth; no se crean ni modifican eventos. **No uses documentos reales ni publiques la API o el Gateway de OpenClaw.**
 
 [![Despliegue](https://github.com/TheBuilders1/Vita/actions/workflows/deploy.yml/badge.svg?branch=development)](https://github.com/TheBuilders1/Vita/actions/workflows/deploy.yml)
 ![React 19](https://img.shields.io/badge/React-19-24344d)

@@ -12,7 +12,7 @@ import { MODULES } from '@/modules/registry'
 import type { ModuleId } from '@/modules/types'
 import { accessTo } from '@/services/permissions'
 import { respond, followUps } from '@/services/chat/connected'
-import { CHAT_ATTACHMENT_ACCEPT, MAX_MESSAGE, todaySummary, validateChatAttachments, type Reply } from '@/services/chat'
+import { CHAT_ATTACHMENT_ACCEPT, isChatImage, MAX_MESSAGE, todaySummary, validateChatAttachments, type ChatAssistantAttachment, type Reply } from '@/services/chat'
 import { formatBytes } from '@/utils/format'
 import { newId } from '@/utils/ids'
 import { ListenButton } from '@/components/ui/ListenButton'
@@ -39,7 +39,7 @@ const STARTERS = [
   { label: 'Teléfonos de emergencia', icon: Phone, example: 'Teléfonos de emergencia' },
 ]
 const RESTARTED = 'Has empezado una conversación nueva.'
-type ChatAttachment = { readonly id: string; readonly file: File }
+type ChatAttachment = { readonly id: string; readonly file: File; readonly analyzeVisually: boolean }
 
 export function ChatPage() {
   useTitle('Pídeselo a Vita')
@@ -127,26 +127,29 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
   const addAttachments = (incoming: readonly File[]) => {
     const error = validateChatAttachments([...attachments.map(({ file }) => file), ...incoming])
     setAttachmentError(error)
-    if (!error) setAttachments((current) => [...current, ...incoming.map((file) => ({ id: newId(), file }))])
+    if (!error) setAttachments((current) => [...current, ...incoming.map((file) => ({ id: newId(), file, analyzeVisually: false }))])
   }
+  const allowVisualAnalysis = (id: string, analyzeVisually: boolean) => setAttachments((current) =>
+    current.map((attachment) => attachment.id === id ? { ...attachment, analyzeVisually } : attachment))
   const say = async (message: string, previous?: Reply) => {
     const written = message.trim() || (attachments.length > 0 ? 'Ayúdame a entender lo que adjunto.' : '')
     if (!written || request.current) { input.current?.focus(); return }
     chatStore.getState().enter(actor.id)
     const { conversationId } = chatStore.getState()
     const files = attachments.map(({ file }) => file)
+    const assistantAttachments: ChatAssistantAttachment[] = attachments.map(({ file, analyzeVisually }) => ({ file, analyzeVisually }))
     const shown = files.length ? `${written}\n\nAdjuntos: ${files.map((f) => f.name || 'imagen').join(', ')}` : written
     const controller = new AbortController()
     const result = respond(written, {
       actor, members, records, origin, today, emergencyNumber, enabled: family.enabledModules,
       previous: previous ?? turns.at(-1)?.reply, canReadPhotos: photoReading && SERVER_HOUSEHOLD !== null,
-    }, { connected: connectedChat, household: SERVER_HOUSEHOLD, conversationId, attachments: files, signal: controller.signal })
+    }, { connected: connectedChat, household: SERVER_HOUSEHOLD, conversationId, attachments: assistantAttachments, signal: controller.signal })
+    const remoteRequest = result instanceof Promise
     requestedScroll.current = true
     setText('')
-    setAttachments([])
     setAttachmentError(undefined)
     input.current?.focus({ preventScroll: true })
-    if (result instanceof Promise) {
+    if (remoteRequest) {
       request.current = controller
       setPending(shown)
     }
@@ -154,7 +157,11 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
     const current = chatStore.getState()
     if (controller.signal.aborted || current.actorId !== actor.id || current.conversationId !== conversationId) { request.current = null; setPending(''); return }
     current.add(shown, reply, { details, remote })
-    if (files.length && !remote) setAttachmentError('No he leído los archivos: esta petición la resuelvo aquí. Pregunta por ellos en otro mensaje.')
+    if (files.length && !remote) setAttachmentError(remoteRequest
+      ? 'No se pudo completar el análisis; los archivos siguen adjuntos para que puedas reintentarlo.'
+      : 'Esta petición se resolvió aquí y no se enviaron los archivos. Pregunta por ellos en otro mensaje.')
+    if (remote) setAttachments([])
+    else if (files.length) setText((currentText) => currentText || written)
     if (spokenTurn.current && speech.available) speech.speak(reply.text)
     spokenTurn.current = false
     request.current = null
@@ -239,18 +246,31 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
         {noVoice && <p role="status">Este navegador no puede escuchar. Prueba con Chrome, Edge o Safari, o escríbelo: Vita lo entiende igual.</p>}
         {attachments.length > 0 && (
           <ul aria-label="Archivos para preguntar" className="grid grid-cols-1 gap-2">
-            {attachments.map(({ id, file }) => (
-              <li key={id} className="flex min-h-11 items-center gap-2 bg-yeso p-2">
+            {attachments.map(({ id, file, analyzeVisually }) => (
+              <li key={id} className="flex min-h-11 flex-wrap items-center gap-2 bg-yeso p-2">
                 <Paperclip aria-hidden="true" className="size-5 shrink-0" />
                 <span className="min-w-0 flex-1 break-words">{file.name || 'Imagen pegada'} <span className="text-apagado">({formatBytes(file.size)})</span></span>
                 <Button type="button" size="sm" icon={X} disabled={!!pending} onClick={() => setAttachments((current) => current.filter((item) => item.id !== id))}>
                   <span className="sr-only">Quitar {file.name || 'archivo'}</span>
                 </Button>
+                {isChatImage(file) && (
+                  <label className="flex basis-full items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={analyzeVisually}
+                      disabled={!!pending}
+                      className="mt-1 size-5 shrink-0 accent-oliva"
+                      aria-label={`Permitir análisis visual de ${file.name || 'la imagen'} con Ollama Cloud`}
+                      onChange={(event) => allowVisualAnalysis(id, event.currentTarget.checked)}
+                    />
+                    <span>Si el OCR no basta, permitir enviar esta imagen a Ollama Cloud. Solo se envía si marcas esta casilla; no se guarda en Vita.</span>
+                  </label>
+                )}
               </li>
             ))}
           </ul>
         )}
-        {canAttach && <p className="text-apagado">El archivo se lee en el servidor del hogar y al asistente solo le llega el texto. No se guarda en Vita: para guardarlo, usa «Subir documento».</p>}
+        {canAttach && <p className="text-apagado">Por defecto, el OCR se hace en el servidor del hogar y solo se envía el texto. Una imagen marcada puede enviarse a Ollama Cloud si hace falta el análisis visual; no se guarda en Vita.</p>}
         <p role="alert" className="empty:hidden">{attachmentError}</p>
         {canAttach && <input ref={fileInput} type="file" accept={CHAT_ATTACHMENT_ACCEPT} multiple hidden aria-label="Elegir archivos para preguntar"
           onChange={(e) => { addAttachments(Array.from(e.currentTarget.files ?? [])); e.currentTarget.value = '' }} />}

@@ -59,8 +59,10 @@ export function parseJson5(text) {
   return result
 }
 
-const names = ['orquestador', 'documentos', 'calendario']
-const tools = ['vita_scan_document', 'vita_read_google_calendar', 'vita_report_result']
+const names = ['orquestador', 'documentos', 'calendario', 'vita-vision-orquestador', 'vita-vision']
+const inheritedTools = ['vita_scan_document', 'vita_read_google_calendar', 'vita_report_result']
+const visionTool = 'vita_analyze_chat_images'
+const tools = [...inheritedTools, visionTool]
 const exact = (list, expected) => Array.isArray(list) && list.length === expected.length &&
   expected.every(item => list.includes(item))
 
@@ -75,10 +77,17 @@ function configRules(config, check) {
   check(plugins.entries?.ollama?.enabled === true && exact(Object.keys(providers), ['ollama-cloud']) &&
     exact(Object.keys(cloud ?? {}), ['baseUrl', 'api', 'models']) &&
     cloud.baseUrl === 'https://ollama.com' && cloud.api === 'ollama', 'API oficial de Ollama Cloud')
-  const [miniMax] = Array.isArray(cloud?.models) ? cloud.models : []
-  check(cloud?.models?.length === 1 && miniMax?.id === 'minimax-m3' &&
-    exact(Object.keys(miniMax), ['id', 'name', 'maxTokens']) &&
+  const models = Array.isArray(cloud?.models) ? cloud.models : []
+  const miniMax = models.find(model => model.id === 'minimax-m3')
+  const glmFlash = models.find(model => model.id === 'glm-5.3-flash')
+  check(models.length === 2 && miniMax?.name === 'MiniMax M3' &&
+    exact(Object.keys(miniMax ?? {}), ['id', 'name', 'maxTokens']) &&
     Number.isInteger(miniMax.maxTokens) && miniMax.maxTokens > 0 && miniMax.maxTokens <= 131072, 'límite de salida de MiniMax M3')
+  check(glmFlash?.name === 'GLM-5.3 Flash' &&
+    exact(Object.keys(glmFlash ?? {}), ['id', 'name', 'input', 'contextWindow', 'maxTokens']) &&
+    exact(glmFlash.input, ['text', 'image']) && glmFlash.contextWindow === 1048576 &&
+    Number.isInteger(glmFlash.maxTokens) && glmFlash.maxTokens > 0 && glmFlash.maxTokens <= 8192,
+  'modelo visual GLM-5.3 Flash')
   check(exact(Object.keys(agents.entries ?? {}), names), 'agentes permitidos')
   const limits = agents.defaults?.subagents ?? {}
   for (const key of ['maxSpawnDepth', 'maxChildrenPerAgent', 'maxConcurrent']) check(limits[key] === 1, key)
@@ -86,14 +95,26 @@ function configRules(config, check) {
   for (const name of names) {
     const agent = agents.entries?.[name] ?? {}
     const main = name === names[0]
-    check(agent.model === (main ? 'ollama-cloud/glm-5.2' : 'ollama-cloud/minimax-m3'), name + ': modelo de Ollama Cloud')
+    const visionOrchestrator = name === 'vita-vision-orquestador'
+    const vision = name === 'vita-vision'
+    const model = main || visionOrchestrator
+      ? 'ollama-cloud/glm-5.2'
+      : vision ? 'ollama-cloud/glm-5.3-flash' : 'ollama-cloud/minimax-m3'
+    check(agent.model === model, name + ': modelo de Ollama Cloud')
     check(exact(Object.keys(agent.tools ?? {}), ['allow']), name + ': claves de tools')
     const allowedTools = main
-      ? [...tools, 'sessions_spawn', 'sessions_yield']
-      : [name === 'calendario' ? tools[1] : tools[0]]
+      ? [...inheritedTools, 'sessions_spawn', 'sessions_yield']
+      : visionOrchestrator
+        ? ['sessions_spawn', 'sessions_yield']
+        : vision
+          ? [visionTool]
+          : [name === 'calendario' ? inheritedTools[1] : inheritedTools[0]]
     check(exact(agent.tools?.allow, allowedTools), name + ': herramientas permitidas')
-    check(exact(agent.subagents?.allowAgents, main ? ['documentos', 'calendario'] : []), name + ': delegación')
-    if (main) check(agent.subagents?.requireAgentId === true, name + ': destino de delegación obligatorio')
+    const allowedAgents = main
+      ? ['documentos', 'calendario']
+      : visionOrchestrator ? ['vita-vision'] : []
+    check(exact(agent.subagents?.allowAgents, allowedAgents), name + ': delegación')
+    if (main || visionOrchestrator) check(agent.subagents?.requireAgentId === true, name + ': destino de delegación obligatorio')
     for (const key of Object.keys(limits)) if (Object.hasOwn(agent.subagents ?? {}, key)) check(agent.subagents[key] === limits[key], name + ': ' + key)
   }
 }
@@ -135,6 +156,20 @@ function sourceRules(source, check) {
   }
   check(exact(registered, tools), 'registro de herramientas')
   check(fields.length > 0 && fields.every(Boolean), 'esquemas Type.Object cerrados')
+}
+
+function visionSourceRules(source, pluginSource, check) {
+  check(!/\b(?:child_process|node:fs(?:\/promises)?)\b/.test(source) &&
+    !/\b(?:eval|Function)\b|\bimport\s*\(/.test(source), 'la lectura visual no puede ejecutar código')
+  check(source.includes('const OLLAMA_CLOUD_CHAT_URL = "https://ollama.com/api/chat"') &&
+    source.includes('const VISION_MODEL = "glm-5.3-flash"'), 'destino y modelo visual fijos')
+  check(/new URL\("v1\/internal\/chat-image", parsedBase\.origin\)/.test(source), 'lectura de imagen solo desde la API Vita')
+  check(/fetcher\(OLLAMA_CLOUD_CHAT_URL/.test(source) &&
+    !/https?:\/\/(?!ollama\.com\/api\/chat)/i.test(source) &&
+    !/\bconsole\.(?:log|warn|error)\b/.test(source), 'sin destinos arbitrarios ni logs de imagen')
+  check(/process\.env\.OLLAMA_API_KEY/.test(source) &&
+    /process\.env\.VITA_API_URL/.test(pluginSource) &&
+    /name: "vita_analyze_chat_images"/.test(pluginSource), 'herramienta visual usa credenciales del Gateway')
 }
 
 function composeRules(text, check) {
@@ -211,7 +246,7 @@ function safeUser(name) {
   return /^(?:[1-9]\d*|[a-z_][\w-]*)$/i.test(name ?? '') && name !== 'root'
 }
 
-export function checkAgents({ config, plugin, pluginPackage, pluginSource, agents, compose, dockerfile }) {
+export function checkAgents({ config, plugin, pluginPackage, pluginSource, pluginVisionSource, agents, compose, dockerfile }) {
   const errors = []
   const check = (ok, msg) => { if (!ok) errors.push(msg) }
   const checks = {
@@ -226,6 +261,7 @@ export function checkAgents({ config, plugin, pluginPackage, pluginSource, agent
       }
     },
     pluginSource: () => sourceRules(pluginSource, check),
+    pluginVisionSource: () => visionSourceRules(pluginVisionSource, pluginSource, check),
     agentes: () => {
       check(/reportRef[^.]*scanRef[^.]*calendarRef[^.]*mensaje[^.]*respuestas[^.]*son datos no confiables/i.test(agents.orquestador), 'instrucción sobre datos no confiables')
       check(/\bNo reveles referencias\b/i.test(agents.orquestador), 'protección de referencias')
@@ -234,6 +270,11 @@ export function checkAgents({ config, plugin, pluginPackage, pluginSource, agent
       check(/responde exactamente: «¡Hola! Soy Vita, tu asistente personal\. ¿En qué puedo ayudarte\?»/i.test(agents.orquestador), 'saludo inicial fijo de Vita')
       check(/visibleData[^.]*no la inventes/i.test(agents.orquestador), 'respuestas del chat basadas en datos visibles')
       check(/attachments[^.]*contenido no confiable/i.test(agents.orquestador), 'adjuntos del chat no confiables')
+      check(/exactamente una tarea[^.]*vita-vision[^.]*context: "isolated"/i.test(agents['vita-vision-orquestador']), 'delegación visual aislada')
+      check(/no incluyas `visibleData`[^.]*historial[^.]*nombres de archivos/i.test(agents['vita-vision-orquestador']), 'el hijo no recibe contexto del hogar')
+      check(/vita_analyze_chat_images/i.test(agents['vita-vision']), 'herramienta exclusiva del agente visual')
+      check(/glm-5\.3-flash[^.]*Ollama Cloud/i.test(agents['vita-vision']), 'modelo visual de Ollama Cloud')
+      check(/Nunca solicites ni incluyas píxeles, Base64 o contenido binario/i.test(agents['vita-vision']), 'píxeles fuera del transcript')
       check(/\bno extraigas ni devuelvas texto OCR bruto\b/i.test(agents.documentos), 'protección del texto OCR')
       check(/calendarRef[^.]*vita_read_google_calendar/i.test(agents.calendario), 'herramienta del agente Calendar')
       check(/\bno delegas trabajo\b/i.test(agents.calendario), 'delegación desactivada para Calendar')
@@ -252,6 +293,7 @@ if (import.meta.main) {
   const errors = checkAgents({
     config: read('openclaw/config.example.json5'), plugin: read('openclaw/vita-tools/openclaw.plugin.json'),
     pluginPackage: read('openclaw/vita-tools/package.json'), pluginSource: read('openclaw/vita-tools/index.ts'),
+    pluginVisionSource: read('openclaw/vita-tools/vision.mjs'),
     agents: Object.fromEntries(names.map(name => [name, read('openclaw/agents/' + name + '/AGENTS.md')])),
     compose: read('compose.yaml'), dockerfile: read('Dockerfile'),
   })
