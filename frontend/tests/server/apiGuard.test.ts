@@ -4,7 +4,7 @@ import { isAllowedCall, readApiConfig } from '../../server/apiGuard'
 const RUN = '11111111-1111-4111-8111-111111111111'
 const call = (extra = {}) => isAllowedCall({ method: 'POST', url: '/api/v1/documents', remote: '127.0.0.1', guard: '1', site: 'same-origin', ...extra })
 
-test.each([['POST', '/api/v1/chat'], ['POST', '/api/v1/chat/attachments'], ['POST', '/api/v1/documents'], ['POST', '/api/v1/runs'], ['GET', `/api/v1/runs/${RUN}`], ['GET', '/api/healthz']])('deja pasar %s %s', (method, url) => expect(call({ method, url })).toBe(true))
+test.each([['POST', '/api/v1/chat'], ['POST', '/api/v1/chat/attachments'], ['POST', '/api/v1/documents'], ['POST', '/api/v1/documents/understand'], ['POST', '/api/v1/runs'], ['GET', `/api/v1/runs/${RUN}`], ['GET', '/api/healthz']])('deja pasar %s %s', (method, url) => expect(call({ method, url })).toBe(true))
 test.each([
   ['GET', '/api/v1/chat'], ['POST', '/api/v1/chat/'], ['POST', '/api/v1/chat/attachments/'], ['POST', '/api/v1/internal/scan'], ['POST', '/api/v1/internal/report-result'], ['POST', `/api/v1/runs/${RUN}/confirm`], ['GET', '/api/v1/documents'], ['DELETE', '/api/v1/documents'], ['GET', '/api/docs'], ['GET', '/api/openapi.json'],
   ['GET', '/api/v1/runs/../internal/scan'], ['GET', '/api/v1/runs/%2e%2e/internal/scan'], ['POST', '/api/v1/documents/'], ['POST', '/api/v1/documents?x=1'], ['POST', '/api//v1/documents'], ['GET', `/api/v1/runs/${RUN}#x`],

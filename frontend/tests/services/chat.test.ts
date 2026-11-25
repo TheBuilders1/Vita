@@ -211,6 +211,11 @@ describe('documentos y personas como fuente', () => {
 })
 
 test.each(['hola', 'ayuda', '¿qué puedes hacer?'])('%s se deriva al orquestador', (text) => expect(ask(text).kind).toBe('assistant'))
+test.each(['hola', 'Hola Vita', 'buenas tardes', '¡Buenos días, Vita!'])('«%s» se contesta con el saludo de Vita, no con la lista de todo', (text) => {
+  // La misma frase que el orquestador, para que sin servidor Vita salude igual.
+  expect(ask(text)).toEqual({ kind: 'assistant', text: '¡Hola! Soy Vita, tu asistente personal. ¿En qué puedo ayudarte?' })
+})
+test.each(['ayuda', '¿qué puedes hacer?', 'hola, ¿qué puedes hacer?'])('«%s» da la lista de lo que sabe hacer', (text) => expect(ask(text).text).toContain('Entiendo frases sencillas'))
 
 describe('acciones y consultas nuevas', () => {
   test.each([

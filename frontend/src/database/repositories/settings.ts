@@ -19,14 +19,14 @@ const shape = {
   emergencyContacts,
   /** Permite enviar fotos de documentos al servidor del hogar. Apagado hasta que alguien lo active. */
   photoReading: z.boolean(),
-  connectedChat: z.boolean().default(false),
+  connectedChat: z.boolean().default(true),
   /** device: solo si la voz no sale del dispositivo · any: también si el navegador la envía a su fabricante. */
   dictation: z.enum(['off', 'device', 'any']),
 }
 const settingsSchema = z.object(shape)
 export type Settings = z.infer<typeof settingsSchema>
 
-export const DEFAULT_SETTINGS: Settings = { textSize: 'normal', contrast: 'normal', motion: 'system', building: '3d', emergencyNumber: '112', emergencyContacts: [], photoReading: false, connectedChat: false, dictation: 'off' }
+export const DEFAULT_SETTINGS: Settings = { textSize: 'normal', contrast: 'normal', motion: 'system', building: '3d', emergencyNumber: '112', emergencyContacts: [], photoReading: false, connectedChat: true, dictation: 'off' }
 
 /** Al leer, cada preferencia dañada vuelve a su valor por defecto sin arrastrar a las demás. */
 const tolerantSchema = z.object({
@@ -37,7 +37,7 @@ const tolerantSchema = z.object({
   emergencyContacts: emergencyContacts.catch([]),
   emergencyNumber: phone.catch(DEFAULT_SETTINGS.emergencyNumber),
   photoReading: shape.photoReading.catch(DEFAULT_SETTINGS.photoReading),
-  connectedChat: shape.connectedChat.catch(false),
+  connectedChat: shape.connectedChat.catch(true),
   dictation: shape.dictation.catch(DEFAULT_SETTINGS.dictation),
 }).catch(DEFAULT_SETTINGS)
 

@@ -37,7 +37,7 @@ from app.google_calendar import (
     exchange_authorization_code,
     list_calendar_events,
 )
-from app.images import ImageRejected, inspect_image
+from app.images import ImageRejected, inspect_document
 from app.ocr import OcrUnavailable, TesseractOCR
 from app.openclaw import GatewayError, GatewayTimeout, OpenClawClient
 from app.reminders import ReminderInPast, scheduled_reminder_at
@@ -54,6 +54,8 @@ from app.schemas import (
     run_outcome_adapter,
 )
 from app.security import authenticated_user, bearer_token, token_digest
+from app.storage import purge_orphans, remove_stored
+from app.understand import UnreadableAnswer, parse_understood
 from app.worker import (
     RunDispatcher,
     RunSignals,
@@ -116,6 +118,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         config.storage_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         recover_interrupted_runs(config)
+        purge_orphans(config)
         yield
 
     api = FastAPI(
@@ -389,7 +392,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings = request.app.state.settings
         data = file.file.read(settings.max_upload_bytes + 1)
         try:
-            metadata = inspect_image(
+            metadata = inspect_document(
                 data,
                 file.content_type,
                 settings.max_upload_bytes,
@@ -449,6 +452,78 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         logger.info("document_uploaded document_id=%s", document_id)
         return DocumentAccepted(documentId=document_id, status="uploaded")
+
+    @api.post("/v1/documents/understand")
+    def understand_document(
+        request: Request,
+        kind: str = Form("other"),
+        file: UploadFile = File(...),
+        user_id: UUID = Depends(authenticated_user),
+    ) -> dict:
+        """Lee una factura o un documento y devuelve sus datos para rellenar la ficha. No guarda el archivo."""
+        if kind not in {"bill", "id", "other"}:
+            raise HTTPException(status_code=422, detail="invalid_hint")
+        settings = request.app.state.settings
+        data = file.file.read(settings.max_upload_bytes + 1)
+        try:
+            text = extract_chat_attachment(
+                data, file.filename, file.content_type, settings, request.app.state.ocr
+            )
+        except ChatAttachmentError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.code) from exc
+        try:
+            # Una sesión por lectura: OpenClaw no mezcla documentos de distintas subidas.
+            answer = request.app.state.openclaw_client.understand(
+                f"vita:{user_id}:understand:{uuid4().hex}", kind, text
+            )
+        except GatewayTimeout as exc:
+            raise HTTPException(status_code=504, detail="assistant_timeout") from exc
+        except GatewayError as exc:
+            status_code = 503 if exc.code in {"gateway_not_configured", "gateway_unavailable"} else 502
+            raise HTTPException(status_code=status_code, detail="assistant_unavailable") from exc
+        try:
+            fields = parse_understood(answer)
+        except UnreadableAnswer as exc:
+            raise HTTPException(status_code=502, detail="unreadable_answer") from exc
+        logger.info("document_understood type=%s", fields.type)
+        return fields.model_dump(mode="json", by_alias=True)
+
+    @api.delete("/v1/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+    def delete_document(
+        document_id: UUID,
+        request: Request,
+        user_id: UUID = Depends(authenticated_user),
+    ) -> None:
+        """Borra el documento, lo que se leyó de él, su aviso y su archivo."""
+        with request.app.state.connect() as conn:
+            document = conn.execute(
+                """
+                SELECT storage_key
+                FROM producto.documents
+                WHERE id = %s AND owner_user_id = %s
+                FOR UPDATE
+                """,
+                (document_id, user_id),
+            ).fetchone()
+            if not document:
+                raise HTTPException(status_code=404, detail="document_not_found")
+            busy = conn.execute(
+                """
+                SELECT 1
+                FROM producto.runs
+                WHERE document_id = %s AND status IN ('queued', 'running')
+                """,
+                (document_id,),
+            ).fetchone()
+            if busy:
+                raise HTTPException(status_code=409, detail="document_in_use")
+            conn.execute("DELETE FROM producto.reminders WHERE document_id = %s", (document_id,))
+            conn.execute("DELETE FROM producto.runs WHERE document_id = %s", (document_id,))
+            conn.execute("DELETE FROM producto.documents WHERE id = %s", (document_id,))
+
+        # Después de confirmar: si la base no se hubiera actualizado, el archivo seguiría haciendo falta.
+        remove_stored(request.app.state.settings.storage_dir, document["storage_key"])
+        logger.info("document_deleted document_id=%s", document_id)
 
     @api.post(
         "/v1/runs",

@@ -109,3 +109,20 @@ def test_demo_sample_is_readable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 
     result = TesseractOCR().scan(tmp_path / "vita-demo-document.png")
     assert result.expires_on == date(2030, 12, 31)
+
+
+@pytest.mark.skipif(
+    not all(shutil.which(tool) for tool in ("tesseract", "pdftotext", "pdftoppm")),
+    reason="Faltan Tesseract o Poppler",
+)
+def test_a_scanned_pdf_is_read_page_by_page(tmp_path: Path) -> None:
+    """Un PDF escaneado no tiene texto: se convierte en imagen y se pasa por OCR."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    page = Image.new("RGB", (1400, 300), "white")
+    font = ImageFont.load_default(size=48)
+    ImageDraw.Draw(page).text((40, 110), "FECHA DE CADUCIDAD: 31/12/2030", fill="black", font=font)
+    document = tmp_path / ("a" * 32 + ".pdf")
+    page.save(document, format="PDF", resolution=150)
+
+    assert TesseractOCR().scan(document) == extract_expiry_date("CADUCIDAD: 31/12/2030")

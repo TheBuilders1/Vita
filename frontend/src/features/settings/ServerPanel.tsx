@@ -19,9 +19,9 @@ export function ServerPanel() {
         <Checkbox label="Permitir leer fotos en el servidor del hogar" help="La fecha se te enseña para que la confirmes o la corrijas." checked={on} onChange={(e) => change(e.target.checked)} />
       </Panel>
       <Panel title="Vita conectada">
-        <Checkbox label="Consultar al asistente del servidor" checked={connected} onChange={e => {
+        <Checkbox label="Hablar con el asistente del servidor" checked={connected} onChange={e => {
           settingsStore.getState().update({ connectedChat: e.target.checked }).then(() => toastStore.getState().show('Preferencia guardada')).catch((cause: unknown) => toastStore.getState().show(describeError(cause), 'error'))
-        }} help="Solo si Vita no entiende tu mensaje, enviará lo que escribas, tu nombre e identificador, los nombres e identificadores de las personas del hogar, la fecha, la zona horaria, la pantalla de origen y hasta seis intercambios anteriores con el servidor. Evita escribir datos privados. Las consultas resueltas en el dispositivo y las fichas del hogar se quedan aquí." />
+        }} help="Vita conversa a través del asistente del servidor de tu hogar, que usa un modelo en la nube. Se envía lo que escribes; si preguntas por algo del hogar, solo los datos que te enseñaría la respuesta; y de un archivo adjunto, solo su texto. Apuntar citas, tareas o la compra y las emergencias se resuelven en este dispositivo. Si lo apagas, todo se queda aquí." />
       </Panel>
     </>
   )

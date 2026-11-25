@@ -41,7 +41,11 @@ const GUIDE = /^(?:como (?:puedo )?|ayuda (?:con|para) )/
 const PHOTO = /\b(escane\w*|lee(?:r|me)? (?:la |una |esta )?(?:foto|caducidad|documento)|foto (?:del|de un|de mi) (?:documento|dni))/
 const AGENDA = /^(?:que|cuales)\b.*\b(?:tengo|tenemos|tienes?|hay|toca|pendientes?|planes|eventos|citas)\b|^(?:mi )?(?:agenda|calendario)\b|^(?:mis? )?(?:planes|citas|tareas|eventos)\b|^(?:tengo|tenemos|hay) (?:algo|planes|citas?)\b/
 const HELP = /^(?:hola|buen[oa]s\b|ayuda|que (?:puedes|sabes) hacer|quien eres|como funciona)/
+/** Solo un saludo: se contesta corto. «Hola, ¿qué puedes hacer?» sigue dando la lista. */
+const GREETING = /^[\s¡!¿?.,]*(?:hola|buen[oa]s(?: (?:dias|tardes|noches))?|hey)(?:[\s,]+vita)?[\s¡!¿?.,]*$/
 
+/** La misma que dice el orquestador: sin servidor, Vita saluda igual. */
+export const GREETING_TEXT = '¡Hola! Soy Vita, tu asistente personal. ¿En qué puedo ayudarte?'
 const HELP_TEXT = 'Entiendo frases sencillas. Puedo apuntar citas, tareas que se repiten y compra. También puedo buscar, revisar la agenda y el gasto del mes, decirte qué hay en la nevera, la clave de la wifi, el veterinario o lo que tiene ahorrado cada hijo, y marcar una tarea o una toma como hecha. Nada se guarda hasta que tú lo confirmas.'
 export const UNKNOWN = 'No te he entendido. Prueba con «apunta dentista para el martes a las 10», «compra leche y pan» o «qué tengo esta semana».'
 
@@ -114,6 +118,7 @@ export function answer(message: string, supplied: ChatContext): Reply {
     return agenda(`mi agenda ${said}`, context, context.previous?.kind === 'agenda' ? context.previous.scope : undefined)
   }
   if (AGENDA.test(said)) return agenda(said, context)
+   if (GREETING.test(full.plain)) return { kind: 'assistant', text: GREETING_TEXT }
    if (HELP.test(full.plain) || /^(?:que (?:puedes|sabes) hacer)/.test(said)) return { kind: 'assistant', text: HELP_TEXT }
    if (/^(?:muchas )?gracias/.test(said)) return { kind: 'text', text: 'De nada.' }
    return { kind: 'assistant', text: UNKNOWN }
