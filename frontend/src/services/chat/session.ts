@@ -29,9 +29,10 @@ const proposal = z.object({ typeId: proposalType, data: z.record(str, z.unknown(
   })
 const reply = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('text'), text: str, link: z.object({ to: path, label: str }).optional() }),
+  z.object({ kind: z.literal('assistant'), text: str }),
   z.object({ kind: z.literal('proposals'), text: str, proposals: z.array(proposal) }),
   z.object({ kind: z.literal('agenda'), text: str, items: z.array(item), remaining: z.array(item),
-    scope: z.object({ memberIds: strings, personal: z.boolean(), subject: z.enum(['appointment','task','event']).optional(), moduleId: moduleId.optional() }).optional() }),
+    scope: z.object({ memberIds: strings, personal: z.boolean(), subject: z.enum(['appointment','task','event','medication']).optional(), moduleId: moduleId.optional() }).optional() }),
   z.object({ kind: z.literal('facts'), text: str, facts: z.array(z.object({ key: str, title: str, text: str,
     recordId: str.optional(), memberId: str.optional(), phone: str.optional(), to: path.optional(), sources: strings.optional(), moduleId: moduleId.optional() })) }),
   z.object({ kind: z.literal('complete'), text: str, choices: z.array(z.object({ recordId: str, updatedAt: str })) }),
@@ -41,6 +42,7 @@ const card = z.discriminatedUnion('state', [
   z.object({ state: z.literal('saved'), recordId: str }), z.object({ state: z.literal('editing') }), z.object({ state: z.literal('undone') }),
 ])
 export const MAX_TURNS = 50
-export const session = z.object({ actorId: str, turns: z.array(z.object({
-  id: str, message: str, reply, cards: z.record(z.string().regex(/^\d+$/), card), remote: z.boolean().optional(),
+const details = reply.refine((r): r is Extract<typeof r, { kind: 'agenda' | 'facts' }> => r.kind === 'agenda' || r.kind === 'facts')
+export const session = z.object({ actorId: str, conversationId: str.optional(), turns: z.array(z.object({
+  id: str, message: str, reply, details: details.optional(), cards: z.record(z.string().regex(/^\d+$/), card), remote: z.boolean().optional(),
 })).max(MAX_TURNS) })

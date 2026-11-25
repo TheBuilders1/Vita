@@ -8,6 +8,7 @@ coverage/
 !.vscode/extensions.json
 .idea/
 .playwright-mcp/
+*.tsbuildinfo
 
 # Backend
 .env

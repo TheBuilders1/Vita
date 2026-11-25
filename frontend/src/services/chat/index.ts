@@ -7,6 +7,16 @@ import type { ChatContext, Reply } from './types'
 import { cut, findDate, findRepeat, phrase } from './when'
 
 export { reviewReply, UNAVAILABLE } from './visibility'
+export {
+  askOrchestrator,
+  assistantContext,
+  shouldUseAssistant,
+  validateChatAttachments,
+  CHAT_ATTACHMENT_ACCEPT,
+  MAX_CHAT_ATTACHMENT_BYTES,
+  MAX_CHAT_ATTACHMENTS,
+  type AssistantContextItem,
+} from './assistant'
 export type { ReviewedReply } from './visibility'
 export type { CardStatus, ChatContext, ChatLink, CompletionChoice, Fact, Proposal, Reply } from './types'
 
@@ -104,7 +114,7 @@ export function answer(message: string, supplied: ChatContext): Reply {
     return agenda(`mi agenda ${said}`, context, context.previous?.kind === 'agenda' ? context.previous.scope : undefined)
   }
   if (AGENDA.test(said)) return agenda(said, context)
-  if (HELP.test(full.plain) || /^(?:que (?:puedes|sabes) hacer)/.test(said)) return { kind: 'text', text: HELP_TEXT }
-  if (/^(?:muchas )?gracias/.test(said)) return { kind: 'text', text: 'De nada.' }
-  return { kind: 'text', text: UNKNOWN }
-}
+   if (HELP.test(full.plain) || /^(?:que (?:puedes|sabes) hacer)/.test(said)) return { kind: 'assistant', text: HELP_TEXT }
+   if (/^(?:muchas )?gracias/.test(said)) return { kind: 'text', text: 'De nada.' }
+   return { kind: 'assistant', text: UNKNOWN }
+ }

@@ -1,4 +1,4 @@
-import { CalendarDays, Check, Mic, Paperclip, NotebookPen, Phone, RotateCcw, Search, Send, Square } from 'lucide-react'
+import { CalendarDays, Check, FileUp, Mic, Paperclip, NotebookPen, Phone, RotateCcw, Search, Send, Square, X } from 'lucide-react'
 import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router'
 import { useStore } from 'zustand'
@@ -12,7 +12,9 @@ import { MODULES } from '@/modules/registry'
 import type { ModuleId } from '@/modules/types'
 import { accessTo } from '@/services/permissions'
 import { respond, followUps } from '@/services/chat/connected'
-import { MAX_MESSAGE, todaySummary, type Reply } from '@/services/chat'
+import { CHAT_ATTACHMENT_ACCEPT, MAX_MESSAGE, todaySummary, validateChatAttachments, type Reply } from '@/services/chat'
+import { formatBytes } from '@/utils/format'
+import { newId } from '@/utils/ids'
 import { ListenButton } from '@/components/ui/ListenButton'
 import { joinDictation } from '@/services/dictation'
 import { describeError } from '@/services/errors'
@@ -38,6 +40,7 @@ const STARTERS = [
   { label: 'Teléfonos de emergencia', icon: Phone, example: 'Teléfonos de emergencia' },
 ]
 const RESTARTED = 'Has empezado una conversación nueva.'
+type ChatAttachment = { readonly id: string; readonly file: File }
 
 export function ChatPage() {
   useTitle('Pídeselo a Vita')
@@ -73,6 +76,9 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
   }
   const [noVoice, setNoVoice] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([])
+  const [attachmentError, setAttachmentError] = useState<string>()
+  const fileInput = useRef<HTMLInputElement>(null)
   const talk = () => {
     if (!canDictate()) { setNoVoice(true); return }
     if (voice.listening) voice.stop()
@@ -124,25 +130,39 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
   // Al abrir el panel se ve lo último de la conversación, junto a donde se escribe.
   useEffect(() => { if (panel) composer.current?.scrollIntoView({ block: 'end' }) }, [panel])
 
+  // Los adjuntos los lee el servidor del hogar: solo se ofrecen con él y con el permiso de Ajustes.
+  const canAttach = connectedChat && SERVER_HOUSEHOLD !== null
+  const addAttachments = (incoming: readonly File[]) => {
+    const error = validateChatAttachments([...attachments.map(({ file }) => file), ...incoming])
+    setAttachmentError(error)
+    if (!error) setAttachments((current) => [...current, ...incoming.map((file) => ({ id: newId(), file }))])
+  }
   const say = async (message: string, previous?: Reply) => {
-    const written = message.trim()
+    const written = message.trim() || (attachments.length > 0 ? 'Ayúdame a entender lo que adjunto.' : '')
     if (!written || request.current) { input.current?.focus(); return }
     chatStore.getState().enter(actor.id)
+    const { conversationId } = chatStore.getState()
+    const files = attachments.map(({ file }) => file)
+    const shown = files.length ? `${written}\n\nAdjuntos: ${files.map((f) => f.name || 'imagen').join(', ')}` : written
     const controller = new AbortController()
     const result = respond(written, {
       actor, members, records, origin, today, emergencyNumber, enabled: family.enabledModules,
       previous: previous ?? turns.at(-1)?.reply, canReadPhotos: photoReading && SERVER_HOUSEHOLD !== null,
-    }, turns, connectedChat, SERVER_HOUSEHOLD, controller.signal)
+    }, { connected: connectedChat, household: SERVER_HOUSEHOLD, conversationId, attachments: files, signal: controller.signal })
     requestedScroll.current = true
     setText('')
+    setAttachments([])
+    setAttachmentError(undefined)
     input.current?.focus({ preventScroll: true })
     if (result instanceof Promise) {
       request.current = controller
-      setPending(written)
+      setPending(shown)
     }
-    const { reply, remote } = await result
-    if (controller.signal.aborted || chatStore.getState().actorId !== actor.id) return
-    chatStore.getState().add(written, reply, remote)
+    const { reply, details, remote } = await result
+    const current = chatStore.getState()
+    if (controller.signal.aborted || current.actorId !== actor.id || current.conversationId !== conversationId) { request.current = null; setPending(''); return }
+    current.add(shown, reply, { details, remote })
+    if (files.length && !remote) setAttachmentError('No he leído los archivos: esta petición la resuelvo aquí. Pregunta por ellos en otro mensaje.')
     if (spokenTurn.current && speech.available) speech.speak(reply.text)
     spokenTurn.current = false
     request.current = null
@@ -196,26 +216,32 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
         <div ref={pending ? latest : undefined} role="status" aria-live="polite" className="chat-wait">{pending && 'Un momento, lo estoy mirando'}</div>
         {last && <Button size="sm" icon={RotateCcw} disabled={!!pending} onClick={clear}>Empezar de nuevo</Button>}
       </div>
-      <form ref={composer} onSubmit={(e: FormEvent) => { e.preventDefault(); void say(text) }} className={`chat-composer ${empty ? '' : 'chat-composer-sticky'}`}>
+      <form ref={composer} onSubmit={(e: FormEvent) => { e.preventDefault(); void say(text) }} className={`chat-composer ${empty ? '' : 'chat-composer-sticky'}`}
+        onPaste={(e) => {
+          if (!canAttach) return
+          const pasted = [...e.clipboardData.files]
+          if (pasted.length > 0) { e.preventDefault(); addAttachments(pasted) }
+        }}>
         {resetToast?.action && <div role="status" className="chat-reset">{RESTARTED} <button type="button" onClick={() => { resetToast.action?.run(); toastStore.getState().dismiss(resetToast.id) }}>Deshacer</button></div>}
         {chips.length > 0 && <div className="chat-chips" role="group" aria-label="Sugerencias">{chips.map(label => (
           <button type="button" key={label} disabled={!!pending} onClick={() => void say(label, last?.reply)}>{label}</button>
         ))}</div>}
         <label className="sr-only" htmlFor="chat-message">Escribe a Vita</label>
         <div className="chat-entry">
-          <textarea id="chat-message" ref={input} required rows={1} maxLength={MAX_MESSAGE} value={text} onChange={e => setText(e.target.value)}
+          <textarea id="chat-message" ref={input} required={attachments.length === 0} rows={1} maxLength={MAX_MESSAGE} value={text} onChange={e => setText(e.target.value)}
             placeholder="Por ejemplo, compra leche y pan" onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void say(text) }
             }} />
           <button type="button" className={`chat-mic ${voice.listening ? 'chat-mic-on' : ''}`} aria-pressed={voice.listening} aria-expanded={dictation === 'off' && canDictate() ? askVoice : undefined} onClick={talk}>
             {voice.listening ? <Square aria-hidden="true" /> : <Mic aria-hidden="true" />}<span className="sr-only">{voice.listening ? 'Dejar de hablar' : 'Hablar'}</span>
           </button>
-          <Button className="chat-send" disabled={!!pending || !text.trim()} type="submit" variant="primary" icon={Send}><span className="max-[30rem]:sr-only">Enviar</span></Button>
+          <Button className="chat-send" disabled={!!pending || (!text.trim() && attachments.length === 0)} type="submit" variant="primary" icon={Send}><span className="max-[30rem]:sr-only">Enviar</span></Button>
         </div>
         {showExample && !voice.listening && <p>Escribe, por ejemplo: dentista el martes a las 10</p>}
         <div className="chat-controls">
           <p><Check aria-hidden="true" />Nada se guarda sin que lo confirmes</p>
-          <button type="button" className="chat-attach" onClick={() => setUploading(true)}><Paperclip aria-hidden="true" />Subir documento</button>
+          <button type="button" className="chat-attach" onClick={() => setUploading(true)}><FileUp aria-hidden="true" />Subir documento</button>
+          {canAttach && <button type="button" className="chat-attach" disabled={!!pending} onClick={() => fileInput.current?.click()}><Paperclip aria-hidden="true" />Preguntar por un archivo</button>}
           {speech.speaking && <Button size="sm" icon={Square} onClick={speech.stop}>Callar a Vita</Button>}
         </div>
         {askVoice && (
@@ -230,6 +256,23 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
           </div>
         )}
         {noVoice && <p role="status">Este navegador no puede escuchar. Prueba con Chrome, Edge o Safari, o escríbelo: Vita lo entiende igual.</p>}
+        {attachments.length > 0 && (
+          <ul aria-label="Archivos para preguntar" className="grid grid-cols-1 gap-2">
+            {attachments.map(({ id, file }) => (
+              <li key={id} className="flex min-h-11 items-center gap-2 bg-yeso p-2">
+                <Paperclip aria-hidden="true" className="size-5 shrink-0" />
+                <span className="min-w-0 flex-1 break-words">{file.name || 'Imagen pegada'} <span className="text-apagado">({formatBytes(file.size)})</span></span>
+                <Button type="button" size="sm" icon={X} disabled={!!pending} onClick={() => setAttachments((current) => current.filter((item) => item.id !== id))}>
+                  <span className="sr-only">Quitar {file.name || 'archivo'}</span>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {canAttach && <p className="text-apagado">El archivo se lee en el servidor del hogar y al asistente solo le llega el texto. No se guarda en Vita: para guardarlo, usa «Subir documento».</p>}
+        <p role="alert" className="empty:hidden">{attachmentError}</p>
+        {canAttach && <input ref={fileInput} type="file" accept={CHAT_ATTACHMENT_ACCEPT} multiple hidden aria-label="Elegir archivos para preguntar"
+          onChange={(e) => { addAttachments(Array.from(e.currentTarget.files ?? [])); e.currentTarget.value = '' }} />}
         <UploadDialog open={uploading} onClose={() => setUploading(false)} />
         <output className="empty:hidden">{voice.listening && 'Te escucho. Habla con calma.'}</output>
         <p role="status" className="empty:hidden">{voice.problem}</p>

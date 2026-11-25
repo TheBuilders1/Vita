@@ -89,6 +89,30 @@ class TesseractOCR:
     def __init__(self, timeout_seconds: int = 20):
         self.timeout_seconds = timeout_seconds
 
+    def read_text(self, data: bytes) -> str:
+        try:
+            result = subprocess.run(
+                [
+                    "tesseract",
+                    "stdin",
+                    "stdout",
+                    "-l",
+                    "spa+eng",
+                    "--psm",
+                    "6",
+                ],
+                input=data,
+                capture_output=True,
+                timeout=self.timeout_seconds,
+                check=False,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+            raise OcrUnavailable from exc
+
+        if result.returncode != 0:
+            raise OcrUnavailable
+        return result.stdout.decode("utf-8", errors="replace")
+
     def scan(self, path: Path) -> ScanResult:
         try:
             result = subprocess.run(

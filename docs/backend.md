@@ -9,6 +9,8 @@ Está pensado para una demo local del hackathon, ejecutada desde `curl` o, de fo
 - Autenticación local mediante tokens de demostración asociados a usuarios sembrados.
 - Comprobación de pertenencia al hogar y propiedad de ejecuciones y documentos.
 - Ejecuciones asíncronas de Vita hacia un Gateway privado de OpenClaw, con resultado estructurado y validado.
+- Chat conversacional para mensajes generales; cada usuario y conversación tienen una sesión de OpenClaw aislada.
+- Adjuntos efímeros en el chat: OCR local de imágenes JPG/PNG/WebP y PDF escaneados, y extracción local de PDF, TXT y DOCX.
 - Conexión OAuth individual a Google Calendar, refresh token cifrado y consultas de solo lectura delegadas a un subagente especializado.
 - Carga privada de imágenes JPEG/PNG con límites de tamaño, dimensiones y decodificación.
 - OCR local con Tesseract; se extrae únicamente una fecha vinculada a una etiqueta de caducidad.
@@ -29,7 +31,7 @@ Cliente (curl)
         └─ vita_report_result ──> API interna ──> resultado validado
 ```
 
-OpenClaw se encarga de interpretar y delegar. No accede directamente a PostgreSQL, al volumen de imágenes ni a credenciales OAuth. La API es la autoridad para permisos, rangos, resultados, estados y escrituras; el texto final de un agente no se considera prueba de que una operación haya terminado.
+OpenClaw se encarga de conversar, interpretar y delegar. No accede directamente a PostgreSQL, al volumen de imágenes ni a credenciales OAuth. La API es la autoridad para permisos, rangos, resultados, estados y escrituras; el texto final de un agente no se considera prueba de que una operación haya terminado. En el chat normal recibe solo una selección local y limitada de datos visibles para responder; no puede consultar el hogar ni modificar datos mediante herramientas.
 
 ### Componentes
 
@@ -61,14 +63,15 @@ Las tablas de producto relacionan los datos con un hogar y su propietario. Los m
 
 ## Requisitos
 
-- Linux para el `compose.yaml` incluido, que usa `network_mode: host` para permitir que la API en contenedor alcance un Gateway que escucha en el loopback del host.
+- Linux para `docker compose`: los servicios web comparten la red del host y se enlazan a loopback para comunicarse sin publicar servicios en la LAN.
 - Docker Engine y Docker Compose.
 - OpenClaw `2026.11.8` con Gateway HTTP privado. La versión está fijada porque el plugin usa la API experimental de OpenClaw.
-- Ollama en el mismo host que el Gateway, con una cuenta de Ollama Cloud.
+- Una [API key de Ollama Cloud](https://ollama.com/settings/keys) y acceso a internet desde el Gateway. No hace falta instalar Ollama.
+- Para procesar PDF, Poppler (`poppler-utils`); el Dockerfile incluido ya lo instala.
 - Node.js `24.22.1` o superior para el runtime del plugin.
 - Para ejecutar las pruebas fuera de Docker: Python `3.11` o superior. La imagen Docker del proyecto usa Python `3.12`.
 
-El Dockerfile instala Tesseract y los datos de idioma español. En Docker Desktop, la configuración de red incluida no es directamente equivalente: ejecuta la API en el host o configura una red privada y un bind restringido antes de cambiar las URLs.
+El Dockerfile instala Tesseract, Poppler y los datos de idioma español. En Docker Desktop, la configuración de red incluida no es directamente equivalente: ejecuta la API en el host o configura una red privada y un bind restringido antes de cambiar las URLs.
 
 ## Puesta en marcha local
 
@@ -89,35 +92,23 @@ Edita `.env` y reemplaza las contraseñas y tokens de ejemplo. Para las contrase
 
 Combina [`openclaw/config.example.json5`](../openclaw/config.example.json5) con tu configuración existente; reemplaza `/absolute/path/to/Vita` por la ruta absoluta de este repositorio. **No sobrescribas tu `openclaw.json`.** El ejemplo configura el Gateway con bind loopback, autenticación por token, el plugin y tres agentes con permisos limitados.
 
-El harness nativo de OpenClaw usa `ollama/glm-5.2:cloud` para `orquestador` y `ollama/minimax-m3:cloud` para `documentos` y `calendario`. Con Ollama escuchando en `127.0.0.1:11434`, inicia sesión y registra los modelos:
+El harness nativo usa `ollama-cloud/glm-5.2` para `orquestador` y `ollama-cloud/minimax-m3` para `documentos` y `calendario`. El plugin integrado `ollama` conecta directamente a `https://ollama.com` por la API nativa; no requiere `ollama signin`, `ollama serve` ni `ollama pull`. Si migras una configuración anterior de Vita, elimina `models.providers.ollama`. Usa solo datos ficticios en el chat y en el calendario de prueba.
+
+Instala la dependencia TypeBox del plugin. El ejemplo ya carga `vita-tools` desde `plugins.load.paths`:
 
 ```bash
-ollama signin
-ollama pull glm-5.2:cloud
-ollama pull minimax-m3:cloud
+npm --prefix openclaw/vita-tools install --no-save --package-lock=false --legacy-peer-deps
 ```
 
-`ollama-local` es un marcador para el daemon local, no una credencial de nube. El Gateway usa la API nativa de Ollama (sin `/v1`) para las llamadas a herramientas. Aunque el Gateway y el daemon estén en loopback, la inferencia se realiza en Ollama Cloud: usa solo datos ficticios en el chat y en el calendario de prueba.
-
-Instala la dependencia TypeBox del plugin (los plugins enlazados no resuelven automáticamente sus dependencias), y después instálalo y comprueba sus herramientas:
+Guarda `OLLAMA_API_KEY` en el `.env` de Vita. Desde la raíz del repositorio, exporta solo las dos credenciales que necesita el Gateway; OpenClaw no toma automáticamente las claves de proveedor del `.env` del proyecto:
 
 ```bash
-cd openclaw/vita-tools
-npm install --no-save --package-lock=false --legacy-peer-deps
-cd ../..
-openclaw plugins install --link "$PWD/openclaw/vita-tools" --accept-capabilities
-openclaw plugins enable vita-tools
-openclaw plugins inspect vita-tools --runtime --json
-```
-
-El proceso del Gateway debe tener disponibles estas variables y reiniciarse después de modificar su configuración:
-
-```bash
-export OPENCLAW_TOKEN='el-mismo-token-configurado-en-.env'
+export OLLAMA_API_KEY="$(node -p 'require("node:util").parseEnv(require("node:fs").readFileSync(".env")).OLLAMA_API_KEY ?? ""')"
+export OPENCLAW_TOKEN="$(node -p 'require("node:util").parseEnv(require("node:fs").readFileSync(".env")).OPENCLAW_TOKEN ?? ""')"
 export VITA_API_URL='http://127.0.0.1:8000'
 ```
 
-Tras reiniciar el Gateway, comprueba que `openclaw models list --provider ollama` liste ambos modelos. Si tu configuración ya define `agents.defaults.subagents.model`, quita ese ajuste del Gateway de Vita: tiene prioridad sobre el modelo del agente destino.
+Arranca el Gateway desde esa terminal. Si usas el perfil separado `vita-demo`, ejecuta `openclaw --profile vita-demo gateway run --port 18789`. Para comprobar el catálogo, usa `openclaw --profile vita-demo models list --provider ollama-cloud`. Si tu configuración ya define `agents.defaults.subagents.model`, quita ese ajuste del Gateway de Vita: tiene prioridad sobre el modelo del agente destino.
 
 Verifica que los agentes tengan cargados sus `AGENTS.md` y que sus herramientas estén restringidas como se indica en el ejemplo:
 
@@ -131,13 +122,17 @@ Si el Gateway corre en otro contenedor, no expongas el puerto en la LAN: configu
 
 ### 3. Arrancar la API y PostgreSQL
 
+Para habilitar el proxy seguro del frontend, copia `frontend/.env.example` a `frontend/.env.local`. Usa un token que esté incluido en `VITA_DEMO_TOKENS` y el UUID del hogar correspondiente; el archivo queda fuera del repositorio.
+
 ```bash
 docker compose up --build
 ```
 
-Compose inicializa PostgreSQL, aplica las migraciones y arranca Uvicorn. Por defecto:
+Compose inicializa PostgreSQL, aplica las migraciones y arranca Uvicorn, OpenClaw y Vite. No hace falta ejecutar el Gateway aparte con `npm exec`; el servicio `openclaw` usa el perfil `vita-demo` y el puerto `18790` para evitar chocar con el Gateway local del host en `18789`. La primera compilación descarga OpenClaw y puede tardar varios minutos. El frontend usa el puerto `5174` para evitar chocar con Vite del host en `5173`. Por defecto:
 
+- Frontend: `http://127.0.0.1:5174`
 - API: `http://127.0.0.1:8000`
+- Gateway OpenClaw: `127.0.0.1:18790` (solo loopback; sin puerto publicado por Docker; configurable con `OPENCLAW_GATEWAY_PORT`)
 - PostgreSQL: `127.0.0.1:55432` (solo loopback)
 - Health check: `http://127.0.0.1:8000/healthz`
 - Documentación interactiva FastAPI: `http://127.0.0.1:8000/docs`
@@ -151,6 +146,9 @@ Las rutas de usuario usan `Authorization: Bearer <token>`. El cliente no puede e
 | Método y ruta | Uso |
 | --- | --- |
 | `GET /healthz` | Comprueba la conexión a PostgreSQL; no requiere autenticación. |
+| `POST /v1/chat` | Responde a un mensaje de conversación general con el orquestador; no consulta los datos del hogar. |
+| `POST /v1/chat/attachments` | Extrae texto localmente de una imagen JPG/PNG/WebP, PDF, TXT o DOCX; no guarda el archivo. |
+| `POST /v1/chat/attachments` | Extrae texto localmente de una imagen, PDF, TXT o DOCX; no guarda el archivo. |
 | `POST /v1/runs` | Crea una ejecución y devuelve `202` con `runId`; admite `documentId` opcional. |
 | `GET /v1/runs/{run_id}` | Consulta estado y resultado; solo el usuario creador. |
 | `POST /v1/documents` | Carga una imagen JPEG/PNG como multipart (`householdId` y `file`). |
@@ -164,6 +162,8 @@ Las rutas de usuario usan `Authorization: Bearer <token>`. El cliente no puede e
 Para consultar eventos, `POST /v1/runs` admite `calendar: {"startDate":"YYYY-MM-DD","endDate":"YYYY-MM-DD"}`. El rango es inclusivo, máximo 31 días, y se interpreta en la zona horaria del hogar. `calendar` no puede combinarse con `documentId`. El subagente consulta hasta 50 eventos del calendario principal y devuelve título, inicio, fin e indicador de día completo. La API verifica que lo reportado coincida con la respuesta obtenida del proveedor.
 
 Los endpoints `/v1/internal/scan`, `/v1/internal/calendar/read` y `/v1/internal/report-result` son exclusivamente para el plugin. Se autentican con referencias aleatorias de vida limitada, no con tokens de usuario, y no forman parte del contrato para clientes.
+
+Los mensajes de `POST /v1/chat`, el texto extraído de los adjuntos y el contexto de esa conversación se procesan con Ollama Cloud. Para una pregunta sobre el hogar, el frontend añade como máximo 20 datos breves que su propia respuesta local ya filtró por permisos; no envía las fichas completas, identificadores internos ni archivos originales. Los adjuntos se leen en memoria o en un directorio temporal protegido y no se guardan. Se admiten hasta 3 archivos de 10 MiB cada uno; se extraen como máximo las primeras 10 páginas PDF con texto o 3 páginas escaneadas. El chat no puede llamar herramientas ni escribir datos. OpenClaw puede conservar la conversación según la retención configurada localmente. Esta API y el Gateway son solo para la demo local: Pages no conecta con ellos y no se deben publicar.
 
 ### Conectar una cuenta y consultar Google Calendar
 
@@ -323,7 +323,7 @@ Las variables principales de `.env` son:
 | `VITA_API_PASSWORD` | Credencial PostgreSQL de la API, con permisos limitados. |
 | `VITA_MIGRATOR_PASSWORD` | Credencial separada usada para aplicar migraciones. |
 | `VITA_DEMO_TOKENS` | Objeto JSON de tokens Bearer a UUID de usuario. |
-| `OPENCLAW_BASE_URL` | URL HTTP(S) privada del Gateway, por defecto `http://127.0.0.1:18789/v1`. |
+| `OPENCLAW_BASE_URL` | URL HTTP(S) privada del Gateway; en Compose usa `http://127.0.0.1:18790/v1` por defecto. |
 | `OPENCLAW_TOKEN` | Token compartido con el Gateway privado. |
 | `OPENCLAW_AGENT_ID` | Agente inicial; por defecto `orquestador`. |
 | `OPENCLAW_TIMEOUT_SECONDS` | Límite de tiempo de la ejecución; por defecto 120 segundos. |

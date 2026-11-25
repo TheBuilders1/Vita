@@ -30,6 +30,40 @@ class CalendarWindow(BaseModel):
         return self
 
 
+class ChatContextItem(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    title: str = Field(min_length=1, max_length=200)
+    detail: str = Field(default="", max_length=800)
+
+
+class ChatAttachment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1, max_length=12_000)
+
+
+class ChatAttachmentText(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1, max_length=12_000)
+
+
+class ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    message: str = Field(min_length=1, max_length=500)
+    conversation_id: str = Field(alias="conversationId", pattern=r"^[a-f0-9]{32}$")
+    context: list[ChatContextItem] = Field(default_factory=list, max_length=20)
+    attachments: list[ChatAttachment] = Field(default_factory=list, max_length=3)
+
+
+class ChatResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(min_length=1, max_length=8000)
+
+
 class CreateRunBody(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 

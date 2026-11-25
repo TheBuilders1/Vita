@@ -25,6 +25,7 @@ from fastapi import (
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import ValidationError
 
+from app.chat_attachments import ChatAttachmentError, extract_chat_attachment
 from app.config import Settings
 from app.database import connect, recover_interrupted_runs
 from app.google_calendar import (
@@ -38,9 +39,12 @@ from app.google_calendar import (
 )
 from app.images import ImageRejected, inspect_image
 from app.ocr import OcrUnavailable, TesseractOCR
-from app.openclaw import OpenClawClient
+from app.openclaw import GatewayError, GatewayTimeout, OpenClawClient
 from app.reminders import ReminderInPast, scheduled_reminder_at
 from app.schemas import (
+    ChatRequest,
+    ChatAttachmentText,
+    ChatResponse,
     ConfirmationAccepted,
     ConfirmBody,
     CreateRunBody,
@@ -323,6 +327,53 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         with request.app.state.connect() as conn:
             conn.execute("SELECT 1")
         return {"status": "ok"}
+
+    @api.post("/v1/chat/attachments", response_model=ChatAttachmentText)
+    def extract_chat_attachment_route(
+        request: Request,
+        file: UploadFile = File(...),
+        _user_id: UUID = Depends(authenticated_user),
+    ) -> ChatAttachmentText:
+        settings = request.app.state.settings
+        data = file.file.read(settings.max_upload_bytes + 1)
+        try:
+            text = extract_chat_attachment(
+                data,
+                file.filename,
+                file.content_type,
+                settings,
+                request.app.state.ocr,
+            )
+        except ChatAttachmentError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.code) from exc
+        return ChatAttachmentText(text=text)
+
+    @api.post("/v1/chat", response_model=ChatResponse)
+    def chat(
+        body: ChatRequest,
+        request: Request,
+        user_id: UUID = Depends(authenticated_user),
+    ) -> ChatResponse:
+        try:
+            message = request.app.state.openclaw_client.chat(
+                f"vita:{user_id}:{body.conversation_id}",
+                body.message,
+                [item.model_dump() for item in body.context],
+                [item.text for item in body.attachments],
+            )
+        except GatewayTimeout as exc:
+            raise HTTPException(status_code=504, detail="assistant_timeout") from exc
+        except GatewayError as exc:
+            status_code = (
+                503
+                if exc.code in {"gateway_not_configured", "gateway_unavailable"}
+                else 502
+            )
+            raise HTTPException(
+                status_code=status_code,
+                detail="assistant_unavailable",
+            ) from exc
+        return ChatResponse(message=message)
 
     @api.post(
         "/v1/documents",

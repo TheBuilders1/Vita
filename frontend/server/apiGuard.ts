@@ -2,7 +2,7 @@
 export interface ApiConfig { readonly target: string; readonly token: string; readonly household: string }
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
-const ALLOWED: readonly RegExp[] = [/^POST \/api\/v1\/chat$/, /^GET \/api\/healthz$/, /^POST \/api\/v1\/documents$/, /^POST \/api\/v1\/runs$/, new RegExp(`^GET /api/v1/runs/${UUID}$`)]
+const ALLOWED: readonly RegExp[] = [/^GET \/api\/healthz$/, /^POST \/api\/v1\/chat$/, /^POST \/api\/v1\/chat\/attachments$/, /^POST \/api\/v1\/documents$/, /^POST \/api\/v1\/runs$/, new RegExp(`^GET /api/v1/runs/${UUID}$`)]
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 

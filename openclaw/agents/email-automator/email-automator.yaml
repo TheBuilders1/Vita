@@ -1,0 +1,127 @@
+# ══════════════════════════════════════════════════════════════
+# OpenClaw Skill Manifest — Email Automator
+# Spec: openclaw_spec v1.0
+# Generated: 2026-11-25
+# ══════════════════════════════════════════════════════════════
+
+openclaw_spec: "1.0"
+
+# ── Identity ──────────────────────────────────────────────────
+name: "Email Automator"
+slug: "email-automator"
+category: "Browser & Automation"
+categorySlug: "browser-automation"
+author: "comm-tools"
+version: "2.1.0"
+license: "MIT"
+rating: 4.5
+securityStatus: "verified"
+lastUpdated: "2026-02-15"
+
+# ── Description ───────────────────────────────────────────────
+description: "Send, receive, and process emails programmatically — templates, attachments, scheduling, and inbox monitoring."
+longDescription: |
+  Email Automator provides complete email automation. Send templated emails with dynamic content, schedule sends, process incoming emails with AI classification, extract attachments, and trigger workflows based on email content. Supports SMTP, Gmail API, Outlook API, and Resend.
+
+# ── Installation ──────────────────────────────────────────────
+install:
+  command: "npx clawhub@latest install email-automator"
+  verify: "openclaw skills info email-automator"
+  uninstall: "openclaw skills uninstall email-automator"
+
+# ── Runtime ───────────────────────────────────────────────────
+runtime:
+  engine: "openclaw"
+  minVersion: "1.0.0"
+  node: ">=18.0.0"
+  timeout: 30000
+  retry:
+    attempts: 3
+    backoff: "exponential"
+
+# ── Default Configuration ────────────────────────────────────
+config:
+  provider: "openai"
+  model: "gpt-4o"
+  temperature: 0.7
+  max_tokens: 4096
+  logging:
+    level: "info"
+    destination: "stdout"
+
+# ── Permissions ───────────────────────────────────────────────
+permissions:
+  - tool: "system.run"
+    description: "Execute shell commands in a sandboxed environment"
+    risk: "medium"
+  - tool: "file.read"
+    description: "Read files from the agent workspace"
+    risk: "low"
+  - tool: "file.write"
+    description: "Write or modify files in the agent workspace"
+    risk: "medium"
+  - tool: "web.search"
+    description: "Search the web for real-time information"
+    risk: "low"
+  - tool: "web.fetch"
+    description: "Fetch content from URLs"
+    risk: "low"
+  - tool: "llm.call"
+    description: "Invoke LLM completions via configured providers"
+    risk: "low"
+
+# ── Compatibility ────────────────────────────────────────────
+compatibility:
+  - platform: "macOS"
+    architecture: "arm64 / x86_64"
+    status: "Full Support"
+    minVersion: "13.0+"
+  - platform: "Linux"
+    architecture: "x86_64 / arm64"
+    status: "Full Support"
+    minVersion: "Ubuntu 22.04+ / Fedora 38+"
+  - platform: "Windows (WSL 2)"
+    architecture: "x86_64"
+    status: "Supported"
+    minVersion: "WSL 2 + Ubuntu 22.04+"
+
+prerequisites:
+  - name: "OpenClaw CLI"
+    version: ">=1.0.0"
+  - name: "Node.js"
+    version: ">=18.0.0"
+
+# ── Use Cases ─────────────────────────────────────────────────
+useCases:
+  - "Send automated follow-up emails"
+  - "Process incoming emails and extract data"
+  - "Build email-triggered workflow automations"
+  - "Generate and send reports via email"
+
+# ── FAQ ───────────────────────────────────────────────────────
+faqs:
+  - question: "Which email providers are supported?"
+    answer: "Gmail, Outlook/Office 365, Resend, SendGrid, Mailgun, and any SMTP server."
+  - question: "Can it process incoming emails?"
+    answer: "Yes — monitor inboxes, classify emails with AI, extract data, and trigger automated responses."
+
+# ── Related Skills ────────────────────────────────────────────
+relatedSlugs:
+  - "form-filler"
+  - "pdf-generator"
+  - "notification-hub"
+
+# ── Changelog ─────────────────────────────────────────────────
+changelog:
+  - version: "2.1.0"
+    date: "2026-02-15"
+    changes:
+      - "Latest stable release"
+      - "Improved output formatting and reliability"
+      - "Enhanced error handling and retry logic"
+
+# ── Links ─────────────────────────────────────────────────────
+links:
+  registry: "https://openclaw-skillshub.com/skills/browser-automation/email-automator/"
+  issues: "https://github.com/openclaw-skills/email-automator/issues"
+  docs: "https://docs.openclaw.dev"
