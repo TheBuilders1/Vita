@@ -35,8 +35,8 @@ const server = createServer(async (req, res) => {
     if (req.url === '/v1/documents/understand') {
       // Datos ficticios fijos: el modelo real los saca del propio documento.
       return send(200, /name="kind"\r\n\r\nbill/.test(Buffer.concat(chunks).toString('latin1'))
-        ? { type: 'bill', concept: 'Factura de prueba · Luz', supplier: 'Eléctrica de prueba', amountCents: 6342, date: '2026-11-03', dueDate: '2026-11-20', category: 'home' }
-        : { type: 'document', kind: 'id', title: 'DNI de prueba', holderName: null, issueDate: '2021-04-30', expiryDate: '2031-04-30' })
+        ? { typeId: 'transaction', data: { kind: 'expense', concept: 'Factura de prueba · Luz', amount: 6342, category: 'home', date: '2026-11-03' } }
+        : { typeId: 'document', data: { kind: 'id', title: 'DNI de prueba', issueDate: '2021-04-30', expiryDate: '2031-04-30' } })
     }
     const body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
     if (typeof body?.message !== 'string' || !body.message.trim() || typeof body.conversationId !== 'string') return send(422, { detail: 'invalid_request' })

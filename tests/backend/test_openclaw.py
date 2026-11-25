@@ -71,6 +71,8 @@ def test_chat_uses_a_scoped_orchestrator_session_and_only_visible_context() -> N
     # Tras el saludo, si se lo piden, explica lo que hace Vita sin inventar funciones.
     for capability in ("citas", "tareas", "compra", "agenda", "documentos", "emergencia", "confirma"):
         assert capability in captured["body"]["messages"][0]["content"]
+    assert "No digas que no se puede guardar" in captured["body"]["messages"][0]["content"]
+    assert "pulse «Guardar»" in captured["body"]["messages"][0]["content"]
     assert json.loads(captured["body"]["messages"][1]["content"]) == {
         "question": "Hola",
         "visibleData": [{"title": "Cita", "detail": "martes, 10:00"}],

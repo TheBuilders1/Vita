@@ -2,8 +2,8 @@ import { createContext, use } from 'react'
 import type { RecordData } from '@/modules/fields'
 
 export interface RecordEditor {
-  /** Abre el formulario de alta; `preset` rellena lo que ya se sabe. */
-  readonly create: (typeId: string, preset?: RecordData) => void
+  /** Abre el formulario de alta; `preset` rellena lo que ya se sabe y `onSaved` avisa al guardarlo. */
+  readonly create: (typeId: string, preset?: RecordData, onSaved?: (data: RecordData) => void) => void
   readonly edit: (recordId: string) => void
   readonly open: (recordId: string) => void
 }

@@ -10,6 +10,8 @@ import { chatStore } from '@/store'
 import { telLink } from '@/utils/links'
 import { CompletionCard } from './CompletionCard'
 import { ProposalCard } from './ProposalCard'
+import { FormattedReply } from './FormattedReply'
+import { plainText } from './richText'
 
 const LINK = 'inline-flex min-h-11 items-center font-bold underline underline-offset-4'
 
@@ -20,8 +22,8 @@ export function ReplyView({ turn }: { turn: Turn }) {
   const details = turn.details && reviewReply(turn.details, context, turn.cards)
   return (
     <div className="grid min-w-0 grid-cols-1 gap-3 [overflow-wrap:anywhere]">
-      <p className="break-words">{reply.text}</p>
-      {reply.text && <div><ListenButton text={() => reply.text} /></div>}
+      <FormattedReply text={reply.text} />
+      {reply.text && <div><ListenButton text={() => plainText(reply.text)} /></div>}
       <Extra reply={reply} turn={turn} />
       {details && <Extra reply={details} turn={turn} />}
     </div>

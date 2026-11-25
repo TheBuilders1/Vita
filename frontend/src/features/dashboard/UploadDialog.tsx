@@ -12,9 +12,10 @@ import { useToday } from '@/hooks/useToday'
 import { getRecordType } from '@/modules/registry'
 import type { RecordData } from '@/modules/fields'
 import { describeError } from '@/services/errors'
-import { toProposal, understandFile, type Hint } from '@/services/chat/understand'
+import { catalogFor, toProposal, understandFile, type Hint } from '@/services/chat/understand'
 import { SERVER_HOUSEHOLD } from '@/services/homeServer'
 import { settingsStore, toastStore } from '@/store'
+import { keepFilesOnServer } from '@/services/serverDocuments'
 import { ACCEPTED_TYPES } from '@/types/records'
 import { preparePhoto } from '@/utils/photo'
 
@@ -40,6 +41,14 @@ export function UploadDialog({ open, onClose }: { open: boolean; onClose: () => 
     id: ['document', { kind: 'id', title: `DNI de ${actor.name}`, member: actor.id }],
     other: ['document', { kind: 'other', title: '' }],
   }
+  // Al guardar la ficha, sus fotos y PDF también van a la base del servidor del hogar.
+  const keepOnServer = canRead && SERVER_HOUSEHOLD !== null ? (saved: RecordData) => {
+    const fileIds = Array.isArray(saved.files) ? saved.files as string[] : []
+    void keepFilesOnServer(fileIds, { household: SERVER_HOUSEHOLD!, get: (fileId) => repositories.files.get(actor.id, fileId) }).then((kept) => {
+      if (kept.kept) toastStore.getState().show('El archivo también está guardado en el servidor de tu hogar.')
+      if (kept.failed) toastStore.getState().show('No se ha podido copiar el archivo al servidor de tu hogar: sigue guardado en este dispositivo.', 'error')
+    })
+  } : undefined
   const upload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -54,16 +63,16 @@ export function UploadDialog({ open, onClose }: { open: boolean; onClose: () => 
       if (canRead) {
         const hint: Hint = kind === 'light' ? 'bill' : kind
         try {
-          const proposal = toProposal(await understandFile(photo, hint, { signal: new AbortController().signal }), { fileId: id, members, actorId: actor.id, today })
+          const proposal = toProposal(await understandFile(photo, hint, catalogFor(actor, family.enabledModules), { signal: new AbortController().signal }), { fileId: id, members, actorId: actor.id, today })
           close()
-          editor.create(proposal.typeId, proposal.data)
+          editor.create(proposal.typeId, proposal.data, keepOnServer)
           return
         } catch (cause) {
           toastStore.getState().show(describeError(cause), 'error')
         }
       }
       close()
-      editor.create(typeId, { ...preset, files: [id] })
+      editor.create(typeId, { ...preset, files: [id] }, keepOnServer)
     } catch (cause) {
       setError(describeError(cause))
     } finally {

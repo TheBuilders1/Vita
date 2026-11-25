@@ -30,7 +30,7 @@ export interface Fact { readonly key: string; readonly title: string; readonly t
 export interface ChatLink { readonly to: string; readonly label: string }
 
 export interface CompletionChoice { readonly recordId: string; readonly updatedAt: string }
-export type CardStatus = { readonly state: 'editing' } | { readonly state: 'saved'; readonly recordId: string } | { readonly state: 'undone' }
+export type CardStatus = { readonly state: 'editing' } | { readonly state: 'saved'; readonly recordId: string; readonly server?: 'saved' | 'failed' } | { readonly state: 'undone' }
 export interface AgendaMatch extends AgendaItem { readonly sources: readonly string[] }
 export interface Contact { readonly recordId: string; readonly name: string; readonly phone: string }
 

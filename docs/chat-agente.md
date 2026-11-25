@@ -9,7 +9,9 @@ Con un servidor del hogar configurado, el chat de Vita habla a través del orque
 | Apuntar algo (citas, tareas, compra), marcar como hecho, emergencias | El navegador. Nada se guarda hasta que la persona lo confirma en la tarjeta. | Nada |
 | Saludo, «¿qué puedes hacer?» o algo que las reglas no entienden | El orquestador | El mensaje |
 | Consultas del hogar («¿cuándo caduca mi DNI?», «¿qué tengo hoy?») | El orquestador redacta la respuesta. El navegador muestra además la ficha o la agenda. | El mensaje y solo los datos que mostraría la respuesta, como máximo 20 |
-| Pregunta con archivos adjuntos | El orquestador | El mensaje y el texto extraído de los archivos. El archivo se lee en el servidor del hogar y no se guarda. |
+| Pegar o adjuntar un archivo (imagen, PDF, texto) | El servidor del hogar extrae el texto y el modelo elige la ficha que encaja (gasto, documento, receta, cita…) y la rellena. Vita muestra una tarjeta para guardarla donde corresponde. Si además se pregunta algo, el orquestador contesta encima de la tarjeta. | El texto del archivo, la lista de fichas que la persona puede crear y, si hay pregunta, el mensaje |
+
+Al pulsar «Guardar» en la tarjeta, la ficha se guarda en el dispositivo y, con servidor, la foto o el PDF se copia también en la base del servidor del hogar (PostgreSQL con su archivo en el volumen privado). Sin servidor, el archivo se guarda en el dispositivo y la tarjeta se prepara con lo que se sabe. Las respuestas del asistente se muestran con párrafos, listas y negritas, pintados como elementos de la página, nunca como HTML del modelo.
 
 Al saludar, el orquestador contesta exactamente «¡Hola! Soy Vita, tu asistente personal. ¿En qué puedo ayudarte?». Si después le preguntan qué puede hacer, explica las funciones de Vita sin ofrecer otras. Sin servidor, el navegador saluda con la misma frase.
 

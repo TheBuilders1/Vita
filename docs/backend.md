@@ -153,6 +153,7 @@ Las rutas de usuario usan `Authorization: Bearer <token>`. El cliente no puede e
 | `POST /v1/runs` | Crea una ejecución y devuelve `202` con `runId`; admite `documentId` opcional. |
 | `GET /v1/runs/{run_id}` | Consulta estado y resultado; solo el usuario creador. |
 | `POST /v1/documents` | Carga una imagen JPEG/PNG o un PDF de hasta 20 páginas como multipart (`householdId` y `file`). |
+| `POST /v1/documents/understand` | Extrae el texto de un archivo y pide al modelo la ficha de Vita que mejor encaja, rellena (`kind` como pista y `catalog` con las fichas que la persona puede crear). Valida que la ficha y sus campos estén en el catálogo. No guarda el archivo. |
 | `DELETE /v1/documents/{document_id}` | Borra el documento, sus ejecuciones, su recordatorio y su archivo; solo quien lo subió. `409 document_in_use` si se está leyendo. |
 | `POST /v1/runs/{run_id}/confirm` | Confirma o corrige la fecha y persiste un recordatorio. |
 | `POST /v1/calendar/connect` | Inicia OAuth de solo lectura para el usuario autenticado. |

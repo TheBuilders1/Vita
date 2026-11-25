@@ -1,4 +1,6 @@
-import { getRecordType } from '@/modules/registry'
+import { getRecordType, RECORD_TYPES } from '@/modules/registry'
+import type { ModuleId } from '@/modules/types'
+import { accessTo } from '@/services/permissions'
 import type { Member } from '@/types/family'
 import { isIsoDate } from '@/utils/dates'
 import { formatDate } from '@/utils/format'
@@ -8,19 +10,32 @@ import type { Proposal, Reply } from './types'
 
 export type Hint = 'bill' | 'id' | 'other'
 
-const date = z.string().refine(isIsoDate).nullable()
-const text = z.string().trim().min(1).max(120)
-const understoodSchema = z.discriminatedUnion('type', [
-  z.strictObject({
-    type: z.literal('bill'), concept: text, supplier: text.nullable(), amountCents: z.number().int().min(1).nullable(), date, dueDate: date,
-    category: z.enum(['home', 'food', 'health', 'education', 'transport', 'leisure', 'clothing', 'pets', 'insurance', 'other']),
-  }),
-  z.strictObject({
-    type: z.literal('document'), kind: z.enum(['id', 'passport', 'healthCard', 'school', 'insurance', 'contract', 'admin', 'other']),
-    title: text, holderName: text.nullable(), issueDate: date, expiryDate: date,
-  }),
-])
+/** Lo que devuelve el servidor: la ficha elegida y sus campos tal como los ha leído el modelo. */
+const understoodSchema = z.strictObject({ typeId: z.string().min(1).max(40), data: z.record(z.string(), z.unknown()) })
 export type Understood = z.infer<typeof understoodSchema>
+
+export interface CatalogType {
+  readonly typeId: string
+  readonly name: string
+  readonly fields: Readonly<Record<string, { kind: string; label: string; required?: boolean; options?: string[] }>>
+}
+
+/** Campos que el modelo no puede rellenar: los escribe la app o apuntan a otras fichas. */
+const SKIPPED = new Set(['files', 'links', 'record'])
+
+/** Las fichas que esta persona puede guardar en los módulos activos: el modelo solo elige entre ellas. */
+export function catalogFor(actor: Member, enabled: readonly ModuleId[]): CatalogType[] {
+  return RECORD_TYPES.filter((type) => enabled.includes(type.moduleId) && accessTo(actor, type.moduleId) === 'write').map((type) => ({
+    typeId: type.id,
+    name: type.name,
+    fields: Object.fromEntries(Object.entries(type.fields)
+      .filter(([, field]) => !field.hidden && !SKIPPED.has(field.kind))
+      .map(([name, field]) => [name, {
+        kind: field.kind, label: field.label, ...(field.required && { required: true }),
+        ...('options' in field && { options: field.options.map((o) => o.value) }),
+      }])),
+  }))
+}
 
 const plain = (value: string) => value.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
@@ -31,7 +46,7 @@ export function hintFor(written: string): Hint {
   return 'other'
 }
 
-/** Sin texto o pidiendo guardarlo: se lee y se propone la ficha. Una pregunta va al asistente con el archivo. */
+/** Sin texto o pidiendo guardarlo, solo se propone la ficha. Si es una pregunta, además contesta el asistente. */
 export function savingIntent(written: string): boolean {
   const said = plain(written).trim()
   if (!said) return true
@@ -39,9 +54,9 @@ export function savingIntent(written: string): boolean {
   return /^(guarda|guardalo|guardala|apunta|apuntalo|apuntala|anota|sube|registra|archiva|anade)\b/.test(said) || /\b(guardalo|guardala|apuntalo|apuntala)\b/.test(said)
 }
 
-/** El titular solo se asigna si coincide sin dudas con una persona del hogar. */
-function holder(name: string | null, members: readonly Member[]): string | undefined {
-  if (!name) return undefined
+/** Una persona solo se asigna si coincide sin dudas con alguien del hogar. */
+function holder(name: unknown, members: readonly Member[]): string | undefined {
+  if (typeof name !== 'string' || !name.trim()) return undefined
   const words = new Set(plain(name).split(/\s+/))
   const matches = members.filter((m) => plain(m.name).split(/\s+/).every((word) => words.has(word)))
   return matches.length === 1 ? matches[0]!.id : undefined
@@ -50,31 +65,54 @@ function holder(name: string | null, members: readonly Member[]): string | undef
 interface ProposalContext { readonly fileId: string; readonly members: readonly Member[]; readonly actorId: string; readonly today: string }
 
 function proposal(typeId: string, data: Record<string, unknown>, notes: string[]): Proposal {
-  const fields = getRecordType(typeId).fields
-  const missing = Object.entries(fields).filter(([key, field]) => field.required && data[key] === undefined).map(([, field]) => field.label)
-  return { typeId, data, notes, missing, ready: missing.length === 0 }
+  const type = getRecordType(typeId)
+  // Lo que el esquema real no acepta se quita: mejor un hueco que un dato mal leído.
+  for (let pass = 0; pass < 5; pass++) {
+    const checked = type.schema.safeParse(data)
+    if (checked.success) break
+    const wrong = [...new Set(checked.error.issues.map((issue) => String(issue.path[0])))].filter((key) => key in data && type.fields[key]?.kind !== 'files')
+    if (wrong.length === 0) break
+    for (const key of wrong) delete data[key]
+  }
+  const missing = Object.entries(type.fields).filter(([key, field]) => field.required && data[key] === undefined).map(([, field]) => field.label)
+  return { typeId, data, notes, missing, ready: missing.length === 0 && type.schema.safeParse(data).success }
 }
 
 const defined = (data: Record<string, unknown>) => Object.fromEntries(Object.entries(data).filter(([, value]) => value !== null && value !== undefined))
 
-export function toProposal(read: Understood, { fileId, members, today }: ProposalContext): Proposal {
-  if (read.type === 'bill') {
-    return proposal('transaction', defined({
-      kind: 'expense', concept: read.concept, amount: read.amountCents, category: read.category, date: read.date ?? read.dueDate ?? today, files: [fileId],
-    }), read.dueDate ? [`Vence el ${formatDate(read.dueDate)}.`] : [])
+export function toProposal(read: Understood, { fileId, members }: ProposalContext): Proposal {
+  const type = getRecordType(read.typeId)
+  const data: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(read.data)) {
+    const field = type.fields[key]
+    if (!field || field.hidden || SKIPPED.has(field.kind) || value === null || value === undefined) continue
+    if (field.kind === 'member') { const id = holder(value, members); if (id) data[key] = id; continue }
+    if (field.kind === 'members') {
+      const ids = (Array.isArray(value) ? value : []).map((name) => holder(name, members)).filter((id): id is string => Boolean(id))
+      if (ids.length) data[key] = [...new Set(ids)]
+      continue
+    }
+    // Se pidieron céntimos; un importe con decimales son euros.
+    data[key] = field.kind === 'money' && typeof value === 'number' && !Number.isInteger(value) ? Math.round(value * 100) : value
   }
-  return proposal('document', defined({
-    kind: read.kind, title: read.title, member: holder(read.holderName, members), issueDate: read.issueDate, expiryDate: read.expiryDate,
-    // La caducidad sale del propio documento: la ficha lo recuerda mientras no se cambie.
-    scannedDate: read.expiryDate, scannedFile: read.expiryDate ? fileId : undefined, files: [fileId],
-  }), [])
+  const filesField = Object.entries(type.fields).find(([, field]) => field.kind === 'files')?.[0]
+  if (filesField) data[filesField] = [fileId]
+  // La caducidad sale del propio documento: la ficha lo recuerda mientras no se cambie.
+  if (read.typeId === 'document' && typeof data.expiryDate === 'string') { data.scannedDate = data.expiryDate; data.scannedFile = fileId }
+  const dueDate = read.data.dueDate
+  const notes = [
+    ...(typeof dueDate === 'string' && isIsoDate(dueDate) ? [`Vence el ${formatDate(dueDate)}.`] : []),
+    ...(filesField ? [] : ['Este tipo de ficha no guarda archivos: el archivo no se adjunta.']),
+  ]
+  return proposal(read.typeId, data, notes)
 }
 
-const UNAVAILABLE = 'No he podido leer el documento en el servidor del hogar. Revisa y completa los datos.'
+const UNAVAILABLE = 'No he podido leer el archivo en el servidor del hogar. Revisa y completa los datos.'
 
-export async function understandFile(file: File, hint: Hint, { signal, fetch: request = fetch }: { signal: AbortSignal; fetch?: typeof fetch }): Promise<Understood> {
+export async function understandFile(file: File, hint: Hint, catalog: readonly CatalogType[], { signal, fetch: request = fetch }: { signal: AbortSignal; fetch?: typeof fetch }): Promise<Understood> {
   const form = new FormData()
   form.set('kind', hint)
+  form.set('catalog', JSON.stringify(catalog))
   form.set('file', file, file.name || 'documento')
   let response: Response
   try {
@@ -85,7 +123,7 @@ export async function understandFile(file: File, hint: Hint, { signal, fetch: re
   }
   if (!response.ok) throw new VitaError(UNAVAILABLE)
   const parsed = understoodSchema.safeParse(await response.json().catch(() => null))
-  if (!parsed.success) throw new VitaError(UNAVAILABLE)
+  if (!parsed.success || !catalog.some((type) => type.typeId === parsed.data.typeId)) throw new VitaError(UNAVAILABLE)
   return parsed.data
 }
 
