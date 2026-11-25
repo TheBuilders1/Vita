@@ -17,7 +17,6 @@ import { ListenButton } from '@/components/ui/ListenButton'
 import { joinDictation } from '@/services/dictation'
 import { describeError } from '@/services/errors'
 import { useSpeech } from '@/hooks/useSpeech'
-import type { Settings } from '@/database/repositories/settings'
 import { SERVER_HOUSEHOLD } from '@/services/homeServer'
 import { chatStore, settingsStore, toastStore } from '@/store'
 import { greeting, restartConversation, scrollDistance } from './conversation'
@@ -65,24 +64,16 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
   const spokenTurn = useRef(false)
   const voice = useDictation((spoken) => { spokenTurn.current = true; setText((written) => joinDictation(written, spoken, MAX_MESSAGE)); input.current?.focus({ preventScroll: true }) })
   const speech = useSpeech()
-  const [askVoice, setAskVoice] = useState(false)
-  const listen = (mode: Settings['dictation']) => {
-    setAskVoice(false)
-    if (mode === 'off') return
-    void voice.start(mode === 'any')
-  }
   const [noVoice, setNoVoice] = useState(false)
   const [uploading, setUploading] = useState(false)
+  /** Pulsar es la decisión: empieza a escuchar y el propio navegador pide permiso para el micrófono. */
   const talk = () => {
     if (!canDictate()) { setNoVoice(true); return }
-    if (voice.listening) voice.stop()
-    else if (dictation === 'off') setAskVoice(!askVoice)
-    else listen(dictation)
-  }
-  const chooseVoice = (mode: 'device' | 'any') => {
-    settingsStore.getState().update({ dictation: mode })
-      .then(() => { toastStore.getState().show(mode === 'device' ? 'Voz activada en este dispositivo' : 'Voz activada'); listen(mode) })
-      .catch((cause: unknown) => toastStore.getState().show(describeError(cause), 'error'))
+    if (voice.listening) { voice.stop(); return }
+    const mode = dictation === 'off' ? 'any' : dictation
+    // Se recuerda para la próxima vez; en Ajustes se puede limitar al dispositivo o apagar.
+    if (dictation === 'off') settingsStore.getState().update({ dictation: mode }).catch((cause: unknown) => toastStore.getState().show(describeError(cause), 'error'))
+    void voice.start(mode === 'any')
   }
   const [pending, setPending] = useState('')
   const request = useRef<AbortController>(null)
@@ -97,7 +88,8 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
     setShowExample(true)
     setParams((current) => { current.delete('hablar'); return current }, { replace: true, preventScrollReset: true })
     input.current?.focus()
-    if (dictation !== 'off' && canDictate()) void voice.start(dictation === 'any')
+    // Viene de «Apuntar hablando»: es la misma decisión que pulsar el micrófono.
+    if (canDictate() && !voice.listening) talk()
   })
   useEffect(() => {
     if (!requestedVoice) return
@@ -207,7 +199,7 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
             placeholder="Por ejemplo, compra leche y pan" onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void say(text) }
             }} />
-          <button type="button" className={`chat-mic ${voice.listening ? 'chat-mic-on' : ''}`} aria-pressed={voice.listening} aria-expanded={dictation === 'off' && canDictate() ? askVoice : undefined} onClick={talk}>
+          <button type="button" className={`chat-mic ${voice.listening ? 'chat-mic-on' : ''}`} aria-pressed={voice.listening} onClick={talk}>
             {voice.listening ? <Square aria-hidden="true" /> : <Mic aria-hidden="true" />}<span className="sr-only">{voice.listening ? 'Dejar de hablar' : 'Hablar'}</span>
           </button>
           <Button className="chat-send" disabled={!!pending || !text.trim()} type="submit" variant="primary" icon={Send}><span className="max-[30rem]:sr-only">Enviar</span></Button>
@@ -218,20 +210,10 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
           <button type="button" className="chat-attach" onClick={() => setUploading(true)}><Paperclip aria-hidden="true" />Subir documento</button>
           {speech.speaking && <Button size="sm" icon={Square} onClick={speech.stop}>Callar a Vita</Button>}
         </div>
-        {askVoice && (
-          <div className="chat-voice-ask">
-            <p>Para hablar con Vita hace falta el micrófono. Solo escucha mientras el botón está pulsado y nada se guarda sin que lo confirmes. ¿Cómo prefieres?</p>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="primary" onClick={() => chooseVoice('device')}>Solo en este dispositivo</Button>
-              <Button size="sm" onClick={() => chooseVoice('any')}>Con el servicio del navegador</Button>
-              <Button size="sm" onClick={() => setAskVoice(false)}>Ahora no</Button>
-            </div>
-            <p className="text-apagado">Con el servicio del navegador, tu voz puede enviarse a la empresa que lo hace (por ejemplo, Google o Apple). Puedes cambiarlo en Ajustes.</p>
-          </div>
-        )}
         {noVoice && <p role="status">Este navegador no puede escuchar. Prueba con Chrome, Edge o Safari, o escríbelo: Vita lo entiende igual.</p>}
         <UploadDialog open={uploading} onClose={() => setUploading(false)} />
         <output className="empty:hidden">{voice.listening && 'Te escucho. Habla con calma.'}</output>
+        {voice.listening && dictation !== 'device' && <p className="text-base text-apagado">Tu navegador convierte la voz en texto con su servicio (por ejemplo, Google o Apple). Puedes cambiarlo en Ajustes.</p>}
         <p role="status" className="empty:hidden">{voice.problem}</p>
       </form>
     </div>
