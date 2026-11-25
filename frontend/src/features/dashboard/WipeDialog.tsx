@@ -20,6 +20,7 @@ export function WipeDialog({ open, title, confirmLabel, onClose, destination, ch
       navigationStore.getState().setEntry(destination)
       toastStore.getState().clear()
       await repositories.family.wipe(actor.id)
+      toastStore.getState().show('Se han borrado todos los datos')
     } catch (cause) {
       setError(describeError(cause))
       setBusy(false)

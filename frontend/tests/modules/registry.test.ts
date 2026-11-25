@@ -61,9 +61,9 @@ describe('compromisos de producto', () => {
     }
   })
 
-  test('ningún campo invita a guardar contraseñas', () => {
+  test('ningún campo invita a guardar contraseñas, salvo la clave de la wifi de casa', () => {
     const suspicious = RECORD_TYPES.flatMap((t) => Object.entries(t.fields).map(([name, f]) => `${t.id}.${name} ${f.label}`))
-      .filter((s) => /password|contraseña|\bpin\b|cvv/i.test(s))
+      .filter((s) => /password|contraseña|\bpin\b|cvv/i.test(s) && !s.startsWith('wifi.password '))
     expect(suspicious).toEqual([])
   })
 })

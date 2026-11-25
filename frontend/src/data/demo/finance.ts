@@ -1,13 +1,22 @@
+import { addMonths } from '@/utils/dates'
 import type { DemoContext } from '.'
 
 export async function financeDemo({ add, day, marta, andres, leo, pilar, today }: DemoContext) {
   const monthStart = `${today.slice(0, 7)}-01`
-  await add(marta, 'transaction', { kind: 'income', concept: 'Nómina de Marta', amount: 198000, category: 'salary', date: monthStart, repeat: 'monthly' })
-  await add(marta, 'transaction', { kind: 'income', concept: 'Nómina de Andrés', amount: 176000, category: 'salary', date: monthStart, repeat: 'monthly' })
-  await add(marta, 'transaction', { kind: 'expense', concept: 'Hipoteca', amount: 72000, category: 'home', date: monthStart, repeat: 'monthly' })
+  // Los fijos empiezan dos meses antes: así el informe trimestral tiene un trimestre que contar.
+  const since = addMonths(monthStart, -2)
+  await add(marta, 'transaction', { kind: 'income', concept: 'Nómina de Marta', amount: 198000, category: 'salary', date: since, repeat: 'monthly' })
+  await add(marta, 'transaction', { kind: 'income', concept: 'Nómina de Andrés', amount: 176000, category: 'salary', date: since, repeat: 'monthly' })
+  await add(marta, 'transaction', { kind: 'expense', concept: 'Hipoteca', amount: 72000, category: 'home', date: since, repeat: 'monthly' })
   await add(marta, 'transaction', { kind: 'expense', concept: 'Compra semanal', amount: 11840, category: 'food', date: today })
-  await add(marta, 'transaction', { kind: 'expense', concept: 'Luz y agua', amount: 13260, category: 'home', date: monthStart, repeat: 'monthly' })
+  await add(marta, 'transaction', { kind: 'expense', concept: 'Luz y agua', amount: 13260, category: 'home', date: since, repeat: 'monthly' })
   await add(marta, 'transaction', { kind: 'expense', concept: 'Zapatillas de Leo', amount: 3990, category: 'clothing', date: today })
+  for (const back of [1, 2]) {
+    const month = addMonths(monthStart, -back)
+    await add(marta, 'transaction', { kind: 'expense', concept: 'Compras del mes', amount: 48000 + back * 3500, category: 'food', date: month.replace(/-01$/, '-15') })
+    await add(marta, 'transaction', { kind: 'expense', concept: 'Gasolina', amount: 9500, category: 'transport', date: month.replace(/-01$/, '-08') })
+    await add(marta, 'transaction', { kind: 'expense', concept: back === 1 ? 'Cine y cena' : 'Excursión al río', amount: 6400 + back * 2000, category: 'leisure', date: month.replace(/-01$/, '-20') })
+  }
   await add(marta, 'budget', { category: 'food', limit: 14000 })
   await add(marta, 'budget', { category: 'leisure', limit: 18000 })
   const trip = await add(marta, 'savingsGoal', { name: 'Vacaciones en la costa', target: 150000, deadline: day(200) })

@@ -4,15 +4,24 @@ import { ChoicesInput } from '@/components/form/ListInputs'
 import { EmptyState } from '@/components/ui/Panel'
 import { RecordList } from '@/features/records/RecordList'
 import { useToday } from '@/hooks/useToday'
+import { FOOD_PLACES } from '@/modules/food'
 import { getRecordType } from '@/modules/registry'
 import { rankRecipes } from '@/services/recipes'
 import { RecipeCard } from './RecipeCard'
 import { Block, TabbedView, useRecords } from './shared'
 
 export function FridgeView() {
+  const items = useRecords('foodItem')
+  const type = getRecordType('foodItem')
+  const inventory = items.length === 0 ? <RecordList type={type} /> : <div className="grid gap-5">
+    {FOOD_PLACES.map((place) => {
+      const group = items.filter((item) => (item.data.place ?? 'other') === place.value)
+      return group.length > 0 && <Block key={place.value} title={place.label}><RecordList type={type} records={group} /></Block>
+    })}
+  </div>
   return (
-    <TabbedView label="Nevera" tabs={[
-      { id: 'items', label: 'Qué hay en casa', content: <RecordList type={getRecordType('foodItem')} /> },
+    <TabbedView label="Nevera y despensa" tabs={[
+      { id: 'items', label: 'Qué hay en casa', content: inventory },
       { id: 'cook', label: 'Qué podemos cocinar', content: <WhatToCook /> },
     ]} />
   )

@@ -24,10 +24,10 @@ export interface DemoContext {
 function demoMembers(today: string): MemberInput[] {
   const born = (years: number, offset: number) => addMonths(addDays(today, offset), -12 * years)
   return [
-    { name: 'Marta', relationship: 'Madre', role: 'master', birthDate: born(44, -70), needs: [] },
-    { name: 'Andrés', relationship: 'Padre', role: 'member', birthDate: born(46, -160), needs: [] },
-    { name: 'Leo', relationship: 'Hijo', role: 'member', birthDate: born(10, 10), needs: ['allergy'] },
-    { name: 'Pilar', relationship: 'Abuela', role: 'vulnerable', birthDate: born(78, -240), needs: ['dependency'] },
+    { name: 'Marta', relationship: 'Madre', role: 'master', birthDate: born(44, -70), needs: [], phone: '555 010 010' },
+    { name: 'Andrés', relationship: 'Padre', role: 'member', birthDate: born(46, -160), needs: [], phone: '555 010 011' },
+    { name: 'Leo', relationship: 'Hijo', role: 'member', birthDate: born(10, 10), needs: ['allergy'], notes: 'Alérgico a los frutos de cáscara: nada con nueces, almendras ni avellanas.' },
+    { name: 'Pilar', relationship: 'Abuela', role: 'vulnerable', birthDate: born(78, -240), needs: ['dependency'], phone: '555 010 012', notes: 'Celíaca: nada con gluten. Oye mejor por el lado izquierdo.' },
   ]
 }
 

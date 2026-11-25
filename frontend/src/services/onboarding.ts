@@ -8,8 +8,8 @@ export const STEPS = [
   { id: 'you', title: '¿Quién eres?' },
   { id: 'count', title: '¿Cuántas personas sois?' },
   { id: 'members', title: '¿Con quién compartes el hogar?' },
+  { id: 'roles', title: '¿Quién es responsable y quién forma parte del hogar?' },
   { id: 'ages', title: '¿Cuándo nació cada persona?' },
-  { id: 'roles', title: '¿Qué puede hacer cada persona?' },
   { id: 'needs', title: '¿Hay algo que debamos tener en cuenta?' },
   { id: 'modules', title: 'Las habitaciones de vuestra casa' },
   { id: 'look', title: '¿Cómo prefieres leer la pantalla?' },
@@ -29,6 +29,8 @@ export interface Draft {
   modules: ModuleId[] | null
   /** Ha elegido completar también los pasos opcionales. */
   detailed: boolean
+  /** Vive solo o sola: sobran los pasos de las demás personas. */
+  alone: boolean
 }
 
 const MAX_MEMBERS = 12
@@ -38,7 +40,7 @@ export function resizeMembers(members: readonly DraftMember[], count: number): D
   return Array.from({ length: size }, (_, i) => members[i] ?? { name: '', relationship: '', birthDate: '', role: i === 0 ? 'master' : 'member', needs: [] })
 }
 
-export const EMPTY_DRAFT: Draft = { name: '', members: resizeMembers([], 1), hasPets: false, modules: null, detailed: false }
+export const EMPTY_DRAFT: Draft = { name: '', members: resizeMembers([], 1), hasPets: false, modules: null, detailed: false, alone: false }
 
 const draftSchema = z.object({
   name: z.string(),
@@ -46,6 +48,7 @@ const draftSchema = z.object({
   hasPets: z.boolean().default(false),
   modules: z.array(moduleIdSchema).nullable().default(null),
   detailed: z.boolean().default(false),
+  alone: z.boolean().default(false),
 })
 
 /** Lo guardado puede venir de otra versión o estar estropeado: ante la duda, se empieza de cero. */
@@ -61,7 +64,7 @@ export function restoreDraft(raw: string | null): Draft {
 export const hasProgress = (draft: Draft): boolean => [draft.name, ...draft.members.flatMap((m) => [m.name, m.relationship, m.birthDate])].some((text) => text.trim() !== '')
 
 export function visibleSteps(draft: Draft): readonly (typeof STEPS)[number][] {
-  return STEPS.filter(({ id }) => ESSENTIAL.has(id) || (draft.detailed && (draft.members.length > 1 || !FOR_OTHERS.has(id))))
+  return STEPS.filter(({ id }) => ESSENTIAL.has(id) || (draft.detailed && !(draft.alone && id === 'count') && ((!draft.alone && draft.members.length > 1) || !FOR_OTHERS.has(id))))
 }
 
 const isUntouched = (m: DraftMember) => m.needs.length === 0 && [m.name, m.relationship, m.birthDate].every((text) => text.trim() === '')

@@ -1,6 +1,7 @@
 import { Phone } from 'lucide-react'
 import { Link } from 'react-router'
 import { useHome } from '@/app/providers/home'
+import { ListenButton } from '@/components/ui/ListenButton'
 import { AgendaRow } from '@/features/calendar/AgendaRow'
 import { useRecordEditor } from '@/features/records/editor'
 import { reviewReply, UNAVAILABLE, type Fact, type ReviewedReply } from '@/services/chat'
@@ -18,6 +19,7 @@ export function ReplyView({ turn }: { turn: Turn }) {
   return (
     <div className="grid min-w-0 grid-cols-1 gap-3 [overflow-wrap:anywhere]">
       <p className="break-words">{reply.text}</p>
+      {reply.text && <div><ListenButton text={() => reply.text} /></div>}
       <Extra reply={reply} turn={turn} />
     </div>
   )
@@ -30,7 +32,7 @@ function Extra({ reply, turn }: { reply: ReviewedReply; turn: Turn }) {
       return (
         <>
           {reply.items.length > 0 && <ul className="grid grid-cols-1 gap-2">{reply.items.map((item) => 'unavailable' in item
-            ? <li key={item.key} className="bg-yeso p-3">{UNAVAILABLE}</li> : <AgendaRow key={item.key} item={item} showDate />)}</ul>}
+            ? <li key={item.key} className="chat-item">{UNAVAILABLE}</li> : <AgendaRow key={item.key} item={item} showDate />)}</ul>}
           <p><Link to="/calendario" className={LINK}>{reply.more > 0 ? `Ver ${reply.more} más en el calendario` : 'Ir al calendario'}</Link></p>
         </>
       )
@@ -39,7 +41,7 @@ function Extra({ reply, turn }: { reply: ReviewedReply; turn: Turn }) {
         ? <p key={i}>{UNAVAILABLE}</p> // oxlint-disable-line react/no-array-index-key -- la lista no cambia
         : <ProposalCard key={i} proposal={p} status={turn.cards[i]} onStatus={(status) => chatStore.getState().mark(turn.id, i, status)} />) // oxlint-disable-line react/no-array-index-key -- la lista no cambia
     case 'complete': return <CompletionCard choices={reply.choices} turn={turn} />
-    case 'facts': return <ul className="grid grid-cols-1 gap-2">{reply.facts.map((f) => <li key={f.key} className="bg-yeso p-3">{'unavailable' in f ? UNAVAILABLE : <FactRow fact={f} />}</li>)}</ul>
+    case 'facts': return <ul className="grid grid-cols-1 gap-2">{reply.facts.map((f) => <li key={f.key} className="chat-item">{'unavailable' in f ? UNAVAILABLE : <FactRow fact={f} />}</li>)}</ul>
     case 'emergency':
       return (
         <div className="grid grid-cols-1 gap-2">

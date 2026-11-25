@@ -57,8 +57,10 @@ const diet = defineModule({
   ],
 })
 
+export const FOOD_PLACES = options({ fridge: 'Nevera', freezer: 'Congelador', pantry: 'Despensa', other: 'Otro' })
+
 const fridge = defineModule({
-  id: 'fridge', floor: 'food', name: 'Nevera inteligente',
+  id: 'fridge', floor: 'food', name: 'Nevera y despensa',
   description: 'Qué hay en casa, cuánto queda y cuándo caduca.',
   recordTypes: [
     defineRecordType({
@@ -67,7 +69,7 @@ const fridge = defineModule({
         name: { kind: 'text', label: 'Alimento', required: true },
         quantity: { kind: 'number', label: 'Cantidad', min: 0 },
         unit: { kind: 'text', label: 'Unidad', maxLength: 30, help: 'Por ejemplo: g, l, unidades.' },
-        place: { kind: 'select', label: 'Dónde está', required: true, options: options({ fridge: 'Nevera', freezer: 'Congelador', pantry: 'Despensa' }) },
+        place: { kind: 'select', label: 'Dónde está', options: FOOD_PLACES },
         expiryDate: { kind: 'date', label: 'Fecha de caducidad' },
       },
       agenda: [{ dateField: 'expiryDate', category: 'deadline', label: 'Caduca' }],

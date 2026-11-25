@@ -3,13 +3,14 @@ import { useMemo, useRef, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
-import { Checkbox, RadioGroup, TextInput } from '@/components/ui/Field'
+import { Checkbox, RadioGroup, TextArea, TextInput } from '@/components/ui/Field'
 import { Notice } from '@/components/ui/Notice'
 import { useToday } from '@/hooks/useToday'
 import { describeError } from '@/services/errors'
 import { memberInputSchema, NEEDS, type Member, type MemberInput } from '@/types/family'
 import { formatDate } from '@/utils/format'
 import { prepareMemberPhoto } from '@/utils/photo'
+import { RelationshipInput } from '@/features/onboarding/RelationshipInput'
 import { NEED_LABELS, ROLE_LABELS, ROLE_OPTIONS } from './labels'
 
 interface ProfileFormProps {
@@ -33,6 +34,7 @@ export function ProfileForm({ member, scope, submitLabel, onSave }: ProfileFormP
     resolver: zodResolver(schema),
     defaultValues: {
       name: member?.name ?? '', birthDate: member?.birthDate ?? '', relationship: member?.relationship ?? '',
+      notes: member?.notes ?? '', phone: member?.phone ?? '',
       role: member?.role ?? 'member', needs: member?.needs ?? [], moduleAccess: member?.moduleAccess ?? {},
     },
   })
@@ -43,6 +45,8 @@ export function ProfileForm({ member, scope, submitLabel, onSave }: ProfileFormP
       <dl className="grid grid-cols-1 gap-3">
         <div><dt className="font-bold">Parentesco</dt><dd>{member.relationship}</dd></div>
         <div><dt className="font-bold">Nacimiento</dt><dd>{formatDate(member.birthDate)}</dd></div>
+        {member.phone && <div><dt className="font-bold">Teléfono</dt><dd>{member.phone}</dd></div>}
+        {member.notes && <div><dt className="font-bold">Qué tener en cuenta</dt><dd className="whitespace-pre-line [overflow-wrap:anywhere]">{member.notes}</dd></div>}
         <div><dt className="font-bold">Rol</dt><dd>{ROLE_LABELS[member.role]}</dd></div>
       </dl>
     )
@@ -83,7 +87,9 @@ export function ProfileForm({ member, scope, submitLabel, onSave }: ProfileFormP
         <div role="alert">{photoError && <Notice tone="error">{photoError}</Notice>}</div>
       </fieldset>
       <TextInput label="Nombre" required autoComplete="off" error={errors.name?.message} {...register('name')} />
-      <TextInput label="Parentesco" required autoComplete="off" error={errors.relationship?.message} {...register('relationship')} />
+      <Controller control={control} name="relationship" render={({ field }) => <RelationshipInput label="Qué es en el hogar" value={field.value} error={errors.relationship?.message} onChange={field.onChange} />} />
+      <TextInput label="Teléfono" type="tel" autoComplete="tel" maxLength={30} error={errors.phone?.message} {...register('phone')} />
+      <TextArea label="Qué tener en cuenta" placeholder="Por ejemplo, celíaca: nada con gluten" maxLength={500} error={errors.notes?.message} {...register('notes')} />
       <TextInput label="Fecha de nacimiento" required type="date" max={today} className="min-w-0 max-[24rem]:px-2" error={errors.birthDate?.message} {...register('birthDate')} />
       {scope === 'full' && (
         <>

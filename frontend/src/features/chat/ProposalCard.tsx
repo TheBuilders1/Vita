@@ -51,7 +51,7 @@ export function ProposalCard({ proposal, status, onStatus }: { proposal: Proposa
   const edit = () => { onStatus({ state: 'editing' }); editor.create(type.id, proposal.data) }
 
   return (
-    <div className="min-w-0 border-2 border-marino bg-crema p-4 max-[24rem]:p-2">
+    <div className="chat-card min-w-0 max-[24rem]:p-2">
       <h2 className="flex items-center gap-3 text-lg font-bold"><ModuleIcon id={type.moduleId} className="size-6" />{type.name}</h2>
       <dl className="mt-2 grid grid-cols-1 gap-2">
         {rows.map((r) => <div key={r.name}><dt className="inline font-bold">{r.label}: </dt><dd className="inline break-words">{r.text}</dd></div>)}

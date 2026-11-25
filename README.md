@@ -165,3 +165,5 @@ docs/                          documentación
 Hecho para el hackathon de Talent Land por [TheBuilders1](https://github.com/TheBuilders1).
 
 </div>
+
+[Contrato del chat y servidor de demostración](docs/chat-agente.md)

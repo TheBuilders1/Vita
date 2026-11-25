@@ -1,9 +1,9 @@
-import { ChevronLeft, ChevronRight, Download, Plus } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight, Download, Mic, Plus } from 'lucide-react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useHome } from '@/app/providers/home'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { Button } from '@/components/ui/Button'
+import { Button, ButtonLink } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { EmptyState, Panel } from '@/components/ui/Panel'
 import { useTitle } from '@/hooks/useTitle'
@@ -12,6 +12,7 @@ import type { AgendaCategory } from '@/modules/types'
 import { buildAgenda, occursOn } from '@/services/agenda'
 import { buildIcs, IcsSizeError, LEAP_EXPORT_YEARS } from '@/services/ics'
 import { addDays, addMonths, isIsoDate, monthWeeks, weekDays } from '@/utils/dates'
+import { isOutOfView } from '@/utils/reveal'
 import { formatDay, formatMonth } from '@/utils/format'
 import { AddDialog } from '@/features/planner/AddDialog'
 import { AgendaRow } from './AgendaRow'
@@ -32,14 +33,21 @@ export function CalendarPage() {
   const [exportError, setExportError] = useState<string>()
   const [adding, setAdding] = useState(false)
   const mobilePeriod = useRef<HTMLHeadingElement>(null)
+  const focusDay = useRef(false)
+  const dayHeading = useRef<HTMLHeadingElement>(null)
   useTitle('Calendario')
 
   const requested = params.get('dia') ?? ''
   const day = isIsoDate(requested) ? requested : today
   const view = params.get('vista') === 'semana' ? 'week' : 'month'
   const go = (changes: { dia?: string; vista?: string }) => {
-    setParams((p) => { for (const [k, v] of Object.entries(changes)) p.set(k, v); return p }, { replace: true })
+    setParams((p) => { for (const [k, v] of Object.entries(changes)) p.set(k, v); return p }, { replace: true, preventScrollReset: true })
   }
+
+  useLayoutEffect(() => {
+    if (focusDay.current) focusDayHeading(dayHeading.current)
+    focusDay.current = false
+  }, [day])
 
   const weeks = useMemo(() => (view === 'week' ? [weekDays(day)] : monthWeeks(day)), [view, day])
   const items = useMemo(() => {
@@ -109,11 +117,12 @@ export function CalendarPage() {
         </button>
       </div>
       <AddDialog open={adding} date={day} onClose={() => setAdding(false)} />
-      <div className="max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-1 max-[24rem]:gap-x-1">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div role="group" aria-label="Vista del calendario" className="flex flex-wrap sm:hidden">
           <Button size="sm" className="max-[24rem]:px-2" aria-pressed={view === 'month'} variant={view === 'month' ? 'primary' : 'secondary'} onClick={() => go({ vista: 'mes' })}>Mes</Button>
           <Button size="sm" className="max-[24rem]:px-2" aria-pressed={view === 'week'} variant={view === 'week' ? 'primary' : 'secondary'} onClick={() => go({ vista: 'semana' })}>Semana</Button>
         </div>
+        <ButtonLink size="sm" icon={Mic} to="/vita?desde=calendar&hablar=1">Apuntar hablando</ButtonLink>
         <CategoryFilter visible={visible} onChange={setVisible} />
       </div>
       <Dialog open={exporting} title="Guardar calendario" error={exportError} onClose={() => setExporting(false)} footer={
@@ -128,9 +137,14 @@ export function CalendarPage() {
       {view === 'week' ? <WeekList days={weeks[0]!} today={today} items={items} /> : (
         <div className="grid grid-cols-1 items-start gap-3 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
           <div className="min-w-0 max-[24rem]:mx-[calc(2px_-_1rem)]">
-            <MonthGrid weeks={weeks} day={day} today={today} items={items} onSelect={(dia) => go({ dia })} />
+            <MonthGrid weeks={weeks} day={day} today={today} items={items} onSelect={(date, openList) => {
+              focusDay.current = openList && date !== day
+              if (date !== day) go({ dia: date })
+              else if (openList) focusDayHeading(dayHeading.current)
+            }} />
           </div>
-          <Panel title={formatDay(day)} className="max-sm:p-3">
+          <Panel className="border border-borde max-sm:p-3">
+            <h2 ref={dayHeading} tabIndex={-1} className="mb-3 border-b-2 border-marino pb-2 text-xl font-bold">{formatDay(day)}</h2>
             {ofDay.length === 0
               ? <><p className="text-apagado sm:hidden">No hay nada este día</p><div className="hidden sm:block"><EmptyState title="No hay nada este día" /></div></>
               : <ul className="grid grid-cols-1 gap-2">{ofDay.map((item) => <AgendaRow key={item.key} item={item} />)}</ul>}
@@ -145,3 +159,15 @@ export function CalendarPage() {
 }
 
 const stepButton = 'grid min-h-[44px] min-w-[44px] place-items-center bg-crema hover:bg-beige focus-visible:outline-offset-[-3px]'
+
+function focusDayHeading(heading: HTMLHeadingElement | null) {
+  if (!heading) return
+  heading.focus({ preventScroll: true })
+  const { top, bottom } = heading.getBoundingClientRect()
+  const root = document.documentElement
+  const inset = Number.parseFloat(getComputedStyle(root).scrollPaddingBottom)
+  if (isOutOfView(top, bottom, window.innerHeight, inset)) {
+    const reduced = root.dataset.motion === 'reduced' || matchMedia('(prefers-reduced-motion: reduce)').matches
+    heading.scrollIntoView({ block: 'nearest', behavior: reduced ? 'instant' : 'smooth' })
+  }
+}

@@ -4,6 +4,7 @@ import type { RecordData } from '@/modules/fields'
 export interface RecordEditor {
   /** Abre el formulario de alta; `preset` rellena lo que ya se sabe. */
   readonly create: (typeId: string, preset?: RecordData) => void
+  readonly edit: (recordId: string) => void
   readonly open: (recordId: string) => void
 }
 export const RecordEditorContext = createContext<RecordEditor | null>(null)
