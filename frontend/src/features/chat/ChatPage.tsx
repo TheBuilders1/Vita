@@ -16,7 +16,7 @@ import { CHAT_ATTACHMENT_ACCEPT, MAX_MESSAGE, todaySummary, validateChatAttachme
 import { formatBytes } from '@/utils/format'
 import { preparePhoto } from '@/utils/photo'
 import { repositories } from '@/database'
-import { proposeFromFiles, savingIntent, understandFile } from '@/services/chat/understand'
+import { catalogFor, proposeFromFiles, savingIntent, understandFile } from '@/services/chat/understand'
 import { newId } from '@/utils/ids'
 import { ListenButton } from '@/components/ui/ListenButton'
 import { joinDictation } from '@/services/dictation'
@@ -27,6 +27,7 @@ import { chatStore, settingsStore, toastStore } from '@/store'
 import { greeting, restartConversation, scrollDistance } from './conversation'
 import { UploadDialog } from '@/features/dashboard/UploadDialog'
 import { ReplyView } from './ReplyView'
+import { plainText } from './richText'
 
 const SUGGESTIONS = ['¿Qué tengo esta semana?', 'Busca el DNI', '¿Cuánto llevamos en comida?', 'Recuérdame regar las plantas cada lunes a las 9']
 const ROOM_IDEAS: Partial<Record<ModuleId, string>> = {
@@ -134,7 +135,8 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
   }
   const say = async (message: string, previous?: Reply) => {
     const files = attachments.map(({ file }) => file)
-    if (files.length && !request.current && (savingIntent(message) || !canAttach)) { void keep(files, message.trim()); return }
+    // Con archivos siempre sale la tarjeta para guardarlos; si además se pregunta, contesta el asistente.
+    if (files.length && !request.current) { void keep(files, message.trim()); return }
     const written = message.trim() || (attachments.length > 0 ? 'Ayúdame a entender lo que adjunto.' : '')
     if (!written || request.current) { input.current?.focus(); return }
     chatStore.getState().enter(actor.id)
@@ -159,7 +161,7 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
     if (controller.signal.aborted || current.actorId !== actor.id || current.conversationId !== conversationId) { request.current = null; setPending(''); return }
     current.add(shown, reply, { details, remote })
     if (files.length && !remote) setAttachmentError('No he leído los archivos: esta petición la resuelvo aquí. Pregunta por ellos en otro mensaje.')
-    if (spokenTurn.current && speech.available) speech.speak(reply.text)
+    if (spokenTurn.current && speech.available) speech.speak(plainText(reply.text))
     spokenTurn.current = false
     request.current = null
     setPending('')
@@ -178,11 +180,17 @@ export function ProfileChat({ home: { actor, members, records, family }, panel =
     setPending(shown)
     let reply: Reply
     try {
-      reply = await proposeFromFiles(files, written, {
+      const catalog = catalogFor(actor, family.enabledModules)
+      const question = written && !savingIntent(written) && canAttach
+        ? respond(written, { actor, members, records, origin, today, emergencyNumber, enabled: family.enabledModules, canReadPhotos: false },
+          { connected: true, household: SERVER_HOUSEHOLD, conversationId, attachments: files, signal: controller.signal })
+        : undefined
+      const [cards, answer] = await Promise.all([proposeFromFiles(files, written, {
         store: async (file) => (await repositories.files.add(actor.id, await preparePhoto(file))).id,
-        read: canAttach ? (file, hint, signal) => understandFile(file, hint, { signal }) : undefined,
+        read: canAttach ? (file, hint, signal) => understandFile(file, hint, catalog, { signal }) : undefined,
         members, actorId: actor.id, today, signal: controller.signal,
-      })
+      }), question])
+      reply = answer?.remote ? { ...cards, text: answer.reply.text } : cards
     } catch (cause) {
       reply = { kind: 'text', text: describeError(cause) }
     }

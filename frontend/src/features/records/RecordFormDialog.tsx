@@ -18,9 +18,9 @@ import type { FamilyRecord } from '@/types/records'
 import { FieldControl } from './FieldControl'
 import { VisibilityInput } from './VisibilityInput'
 
-interface RecordFormProps { type: RecordTypeDef; record?: FamilyRecord; preset?: RecordData; copyOf?: FamilyRecord | undefined; onClose: () => void }
+interface RecordFormProps { type: RecordTypeDef; record?: FamilyRecord; preset?: RecordData; copyOf?: FamilyRecord | undefined; onSaved?: ((data: RecordData) => void) | undefined; onClose: () => void }
 
-export function RecordFormDialog({ type, record, preset, copyOf, onClose }: RecordFormProps) {
+export function RecordFormDialog({ type, record, preset, copyOf, onSaved, onClose }: RecordFormProps) {
   const { actor, members } = useHome()
   const today = useToday()
   const form = useRef<HTMLFormElement>(null)
@@ -55,6 +55,7 @@ export function RecordFormDialog({ type, record, preset, copyOf, onClose }: Reco
       if (record) await repositories.records.update(actor.id, record.id, { data, ...access, ...(opened && { ifUnchanged: opened }) })
       else await repositories.records.create(actor.id, { typeId: type.id, data, ...access, ...(copyOf && { copyOf: copyOf.id, ...(sharing.touched && opened && { ifUnchanged: opened }) }) })
       toastStore.getState().show(`Guardado: ${type.name.toLowerCase()}`)
+      if (!record) onSaved?.(data)
       onClose()
     } catch (error) {
       setFailure(describeError(error))

@@ -55,7 +55,7 @@ from app.schemas import (
 )
 from app.security import authenticated_user, bearer_token, token_digest
 from app.storage import purge_orphans, remove_stored
-from app.understand import UnreadableAnswer, parse_understood
+from app.understand import InvalidCatalog, UnreadableAnswer, parse_catalog, parse_understood
 from app.worker import (
     RunDispatcher,
     RunSignals,
@@ -457,12 +457,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def understand_document(
         request: Request,
         kind: str = Form("other"),
+        catalog: str = Form(...),
         file: UploadFile = File(...),
         user_id: UUID = Depends(authenticated_user),
     ) -> dict:
-        """Lee una factura o un documento y devuelve sus datos para rellenar la ficha. No guarda el archivo."""
+        """Lee un archivo y devuelve la ficha de Vita que mejor encaja, rellena. No guarda el archivo."""
         if kind not in {"bill", "id", "other"}:
             raise HTTPException(status_code=422, detail="invalid_hint")
+        try:
+            types = parse_catalog(catalog)
+        except InvalidCatalog as exc:
+            raise HTTPException(status_code=422, detail="invalid_catalog") from exc
         settings = request.app.state.settings
         data = file.file.read(settings.max_upload_bytes + 1)
         try:
@@ -474,7 +479,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             # Una sesión por lectura: OpenClaw no mezcla documentos de distintas subidas.
             answer = request.app.state.openclaw_client.understand(
-                f"vita:{user_id}:understand:{uuid4().hex}", kind, text
+                f"vita:{user_id}:understand:{uuid4().hex}", kind, text, types
             )
         except GatewayTimeout as exc:
             raise HTTPException(status_code=504, detail="assistant_timeout") from exc
@@ -482,11 +487,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             status_code = 503 if exc.code in {"gateway_not_configured", "gateway_unavailable"} else 502
             raise HTTPException(status_code=status_code, detail="assistant_unavailable") from exc
         try:
-            fields = parse_understood(answer)
+            understood = parse_understood(answer, types)
         except UnreadableAnswer as exc:
             raise HTTPException(status_code=502, detail="unreadable_answer") from exc
-        logger.info("document_understood type=%s", fields.type)
-        return fields.model_dump(mode="json", by_alias=True)
+        logger.info("document_understood type_id=%s", understood.type_id)
+        return understood.model_dump(mode="json", by_alias=True)
 
     @api.delete("/v1/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
     def delete_document(
