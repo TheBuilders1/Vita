@@ -1,7 +1,7 @@
 # Vita: frontend
 
 Gestión del hogar en un espacio privado, alrededor de un edificio isométrico de cinco plantas.
-Los datos se guardan en el navegador (IndexedDB). Solo salen las fotos de documentos que se manden leer, si se activa esa opción.
+Los datos se guardan en el navegador (IndexedDB). Si se activan las opciones correspondientes, el servidor del hogar recibe las fotos que se manden leer y los mensajes que Vita no entienda en el dispositivo. El dictado remoto puede enviar la voz al proveedor del navegador.
 
 > Los datos **no están cifrados** en el navegador (la copia de seguridad sí puede llevar contraseña). Se pierden si se borra el almacenamiento del navegador, y los roles
 > simulan permisos dentro de la app: no protegen frente a quien use este dispositivo.
@@ -20,7 +20,7 @@ pnpm e2e      # navegador y accesibilidad sobre la versión compilada (antes, pn
 ## Leer fotos con el servidor del hogar (opcional)
 
 Solo con `pnpm dev`. Arranca el backend, copia `.env.example` a `.env.local`, pon el token y el hogar, y reinicia. Después se activa en Ajustes.
-El token se queda en el proxy de Vite, que solo admite cuatro llamadas y solo desde este equipo. Sin `.env.local`, la opción no aparece.
+El token se queda en el proxy de Vite, que solo admite las rutas previstas y solo desde este equipo. Sin `.env.local`, la opción no aparece.
 
 ## Estado
 

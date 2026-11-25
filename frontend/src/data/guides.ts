@@ -18,11 +18,11 @@ export const GUIDES: Partial<Record<ModuleId, readonly Guide[]>> = {
   cybersecurity: [
     { title: 'Señales de una estafa', points: ['Mete prisa o miedo: «hoy se bloquea tu cuenta».', 'Pide claves, códigos que llegan por SMS o pagos raros.', 'El enlace o el remitente no coinciden con el oficial.', 'Promete un premio que no esperabas.'] },
     { title: 'Qué hacer', points: ['No pulses ni contestes. Busca tú el teléfono oficial y llama.', 'Si diste datos del banco, llama a tu banco cuanto antes.', 'Guarda pruebas y denúncialo.'] },
-    { title: 'Contraseñas', points: ['Largas y distintas para cada servicio; un gestor de contraseñas ayuda.', 'Activa la verificación en dos pasos.', 'No las guardes en Vita: los datos no van cifrados.'] },
+    { title: 'Contraseñas', points: ['Largas y distintas para cada servicio; un gestor de contraseñas ayuda.', 'Activa la verificación en dos pasos.', 'Para las claves de tus cuentas, usa un gestor de contraseñas.'] },
     { title: 'Proteger a los menores', points: ['Que sepan que pueden contarlo sin castigo.', 'Nada de fotos, dirección o colegio a desconocidos.'] },
   ],
   digitalInfo: [
-    { title: 'Antes de reenviar, cinco preguntas', points: ['¿Quién lo publica y se le puede identificar?', '¿De cuándo es? Muchas cadenas reciclan noticias viejas.', '¿Lo cuentan otras fuentes fiables?', '¿La imagen es de ese momento y lugar?', '¿Me hace sentir rabia o miedo? Razón de más para comprobarlo.'] },
+    { title: 'Cómo comprobar una noticia', points: ['¿Quién lo publica y se le puede identificar?', '¿De cuándo es? Muchas cadenas reciclan noticias viejas.', '¿Lo cuentan otras fuentes fiables?', '¿La imagen es de ese momento y lugar?', '¿Me hace sentir rabia o miedo? Razón de más para comprobarlo.'] },
   ],
   care: [
     { title: 'Cuidar a quien cuida', points: ['Repartid turnos y apuntadlos: lo que no se ve, se carga siempre a la misma persona.', 'Preguntad en servicios sociales por ayudas y respiro familiar.'] },

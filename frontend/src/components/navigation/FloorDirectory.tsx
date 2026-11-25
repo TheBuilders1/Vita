@@ -18,6 +18,8 @@ interface FloorDirectoryProps {
 export const floorButtonId = (id: FloorId) => `floor-${id}`
 export const roomButtonId = (id: ModuleId) => `room-${id}`
 
+export const nextFloor = (selected: FloorId | null, pressed: FloorId) => selected === pressed ? null : pressed
+
 const TOP_DOWN = FLOORS.toReversed()
 
 /** El directorio del portal: plantas en el orden del edificio y, en la elegida, sus habitaciones. */

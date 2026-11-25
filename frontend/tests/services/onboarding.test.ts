@@ -13,7 +13,7 @@ describe('pasos', () => {
   test('lo imprescindible son dos: el hogar y quién eres', () => expect(ids(EMPTY_DRAFT)).toEqual(['name', 'you']))
   test('se empieza con una sola persona', () => expect(EMPTY_DRAFT.members).toHaveLength(1))
   test('con detalles siguen los ocho pasos del encargo', () => {
-    expect(ids(draft({ detailed: true, members: [person(), person()] }))).toEqual(['name', 'you', 'count', 'members', 'ages', 'roles', 'needs', 'modules', 'look'])
+    expect(ids(draft({ detailed: true, members: [person(), person()] }))).toEqual(['name', 'you', 'count', 'members', 'roles', 'ages', 'needs', 'modules', 'look'])
   })
   test('quien vive solo no repasa a los demás', () => {
     expect(ids(draft({ detailed: true }))).toEqual(['name', 'you', 'count', 'needs', 'modules', 'look'])

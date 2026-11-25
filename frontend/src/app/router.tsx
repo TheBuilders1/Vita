@@ -11,6 +11,7 @@ export const router = createBrowserRouter([
     errorElement: <RouteError />,
     hydrateFallbackElement: <output className="block p-8">Abriendo Vita…</output>,
     children: [
+      { path: '/presentacion', lazy: async () => ({ Component: (await import('@/features/pitch/PitchPage')).PitchPage }) },
       { path: '/bienvenida', lazy: async () => ({ Component: (await import('@/features/welcome/WelcomePage')).WelcomePage }) },
       { path: '/crear', lazy: async () => ({ Component: (await import('@/features/onboarding/OnboardingPage')).OnboardingPage }) },
       {

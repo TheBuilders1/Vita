@@ -34,7 +34,7 @@ export const HELP: readonly HelpGroup[] = [
     title: 'Seguridad y comodidad',
     topics: [
       { id: 'letra', question: 'Ver la letra más grande o con más contraste', steps: ['En Ajustes, en «Lectura y movimiento».'], link: { to: '/ajustes', label: 'Ir a Ajustes' } },
-      { id: 'copia', question: 'No perder los datos', steps: ['Todo se guarda solo en este navegador. Si se borran sus datos, se pierde.', 'En Ajustes, en «Copias de seguridad», guarda una copia de vez en cuando y ponla en otro sitio.'], link: { to: '/ajustes#copias', label: 'Hacer una copia' } },
+      { id: 'copia', question: 'No perder los datos', steps: ['Los registros del hogar se guardan en este navegador. Si borras sus datos, perderás los registros.', 'En Ajustes, en «Copias de seguridad», guarda una copia de vez en cuando y ponla en otro sitio.'], link: { to: '/ajustes#copias', label: 'Hacer una copia' } },
       { id: 'otro', question: 'Usar Vita en otro dispositivo', steps: ['Guarda una copia aquí y ábrela en el otro con «Restaurar una copia».', 'A partir de ahí son independientes: lo que cambies en uno no aparece en el otro.'], link: { to: '/ajustes#copias', label: 'Copias de seguridad' } },
       { id: 'urgencia', question: 'Tengo una emergencia', steps: ['Pulsa «Emergencias»: verás el teléfono y los datos importantes de cada persona.', 'Vita no llama sola ni avisa a nadie.'], link: { to: '/planta/health/emergency', label: 'Ir a Emergencias' } },
     ],

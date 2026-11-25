@@ -131,7 +131,8 @@ function itemsOf(record: FamilyRecord, entry: AgendaEntry, index: number, from: 
   const { data } = record
   const type = getRecordType(record.typeId)
   const start = text(data, entry.dateField)
-  if (!start) return []
+  // Un plan cancelado ya no ocupa el calendario.
+  if (!start || data.status === 'cancelled') return []
   const end = text(data, entry.endField)
   const span = end ? diffDays(start, end) : 0
   const repeat = entry.repeat ?? ((text(data, entry.repeatField) ?? 'none') as Repeat)

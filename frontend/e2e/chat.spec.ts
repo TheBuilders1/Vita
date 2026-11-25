@@ -1,0 +1,22 @@
+import { expect, expectNoOverflow, test } from './support'
+
+test('conversa desde el calendario y recupera el hilo al recargar', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 })
+  await page.goto('./calendario')
+  const opener = page.getByRole('button', { name: 'Pregúntame a Vita', exact: true })
+  await opener.click()
+  const chat = page.getByRole('dialog', { name: 'Pídeselo a Vita' })
+  await expect(chat.getByText(/desde Calendario/)).toBeVisible()
+  await chat.getByLabel('Escribe a Vita').fill('¿Qué tengo hoy?')
+  await chat.getByLabel('Escribe a Vita').press('Enter')
+  await expect(chat.getByRole('button', { name: '¿Y mañana?' })).toBeVisible()
+  await expectNoOverflow(page)
+  await page.reload()
+  await opener.click()
+  await expect(chat.getByRole('log')).toContainText('¿Qué tengo hoy?')
+  await chat.getByRole('button', { name: '¿Y mañana?' }).click()
+  await expect(chat.getByRole('log').locator('ol > li')).toHaveCount(2)
+  await page.keyboard.press('Escape')
+  await expect(opener).toBeFocused()
+  await expect(page).toHaveURL(/\/calendario$/)
+})

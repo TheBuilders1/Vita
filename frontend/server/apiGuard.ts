@@ -2,14 +2,14 @@
 export interface ApiConfig { readonly target: string; readonly token: string; readonly household: string }
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
-const ALLOWED: readonly RegExp[] = [/^GET \/api\/healthz$/, /^POST \/api\/v1\/documents$/, /^POST \/api\/v1\/runs$/, new RegExp(`^GET /api/v1/runs/${UUID}$`)]
+const ALLOWED: readonly RegExp[] = [/^POST \/api\/v1\/chat$/, /^GET \/api\/healthz$/, /^POST \/api\/v1\/documents$/, /^POST \/api\/v1\/runs$/, new RegExp(`^GET /api/v1/runs/${UUID}$`)]
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 
 interface Call { readonly method: string | undefined; readonly url: string | undefined; readonly remote: string | undefined; readonly guard: string | undefined; readonly site: string | undefined }
 
 /**
- * Solo las cuatro llamadas que hacen falta y solo desde este equipo. La cabecera propia obliga al navegador
+ * Solo las llamadas que hacen falta y solo desde este equipo. La cabecera propia obliga al navegador
  * a pedir permiso antes: sin ella, otra web abierta podría usar el token sin saberlo nadie.
  */
 export function isAllowedCall({ method, url, remote, guard, site }: Call): boolean {

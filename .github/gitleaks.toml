@@ -5,3 +5,8 @@ useDefault = true
 [[allowlists]]
 description = "Tokens de ejemplo"
 regexes = ['''(alba|bruno|carla)-demo-token-change-me''']
+
+# Clave wifi ficticia del hogar de ejemplo y token del servidor de prueba del chat (tools/chat-mock.mjs).
+[[allowlists]]
+description = "Valores ficticios de la demo"
+regexes = ['''ejemplo-ficticio-2026''', '''demo-local''']

@@ -19,6 +19,7 @@ import { canManage } from '@/services/permissions'
 import { settingsStore, toastStore } from '@/store'
 import { BackupPanel } from './BackupPanel'
 import { DictationPanel } from './DictationPanel'
+import { EmergencyContacts } from './EmergencyContacts'
 import { ModulePicker } from './ModulePicker'
 import { PreferencesForm } from './PreferencesForm'
 import { ServerPanel } from './ServerPanel'
@@ -39,7 +40,7 @@ export function SettingsPage() {
   const [modules, setModules] = useState(family.enabledModules)
   const changeModules = (enabledModules: ModuleId[]) => {
     setModules(enabledModules)
-    repositories.family.update(actor.id, { enabledModules }).catch((e: unknown) => {
+    repositories.family.update(actor.id, { enabledModules }).then(() => toastStore.getState().show('Habitaciones guardadas')).catch((e: unknown) => {
       setModules(family.enabledModules)
       toastStore.getState().show(describeError(e), 'error')
     })
@@ -48,7 +49,7 @@ export function SettingsPage() {
     <div className="mx-auto grid w-full max-w-4xl grid-cols-1 gap-6">
       <PageHeader title="Ajustes" description="Los cambios se guardan al momento en este dispositivo." action={<ButtonLink to="/ayuda" icon={CircleHelp}>Ayuda</ButtonLink>} />
       <Panel title="Lectura y movimiento"><PreferencesForm /></Panel>
-      <Panel title="Número de emergencias"><EmergencyNumber /></Panel>
+      <Panel title="Número de emergencias"><EmergencyNumber /><EmergencyContacts /></Panel>
       {canManage(actor, 'modules') && (
         <div id="habitaciones" className="scroll-mt-4">
           <Panel title="Habitaciones abiertas">

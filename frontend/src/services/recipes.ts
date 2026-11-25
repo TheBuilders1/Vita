@@ -56,3 +56,10 @@ export function missingForShopping(recipes: readonly FamilyRecord[], available: 
   }
   return missing
 }
+
+/** La preparación, paso a paso: por líneas y, si es un solo párrafo, por frases. */
+export function recipeSteps(text: unknown): string[] {
+  if (typeof text !== 'string') return []
+  const lines = text.split('\n').map((line) => line.replace(/^\s*(?:\d+\s*[.)-]|[-•*])\s*/, '').trim()).filter(Boolean)
+  return lines.length === 1 ? (lines[0]!.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? []).map((s) => s.trim()).filter(Boolean) : lines
+}

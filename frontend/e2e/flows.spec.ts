@@ -25,7 +25,7 @@ test('borrar se deshace al momento y desde la papelera', async ({ page }) => {
   await page.getByRole('dialog').getByLabel('Tarea', { exact: true }).fill('Prueba de borrado')
   await page.getByRole('dialog').getByRole('button', { name: 'Guardar' }).click()
   const remove = async () => {
-    await row.getByRole('button').last().click()
+    await row.getByRole('button', { name: /^Prueba de borrado/ }).click()
     await expectAccessible(page)
     await page.getByRole('dialog').getByRole('button', { name: 'Eliminar' }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Eliminar tarea' }).click()
@@ -121,7 +121,7 @@ test('se abre sin conexión', async ({ page, context }) => {
 
 test('el dictado está apagado, y activarlo avisa y enseña el botón', async ({ page }) => {
   await page.goto('./vita')
-  await expect(page.getByRole('button', { name: 'Dictar' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Hablar' })).toHaveCount(0)
   await page.goto('./ajustes')
   await expect(page.getByRole('heading', { name: 'Ajustes', level: 1 })).toBeVisible()
   const remote = page.getByRole('radio', { name: /También con el servicio/ })
@@ -130,5 +130,17 @@ test('el dictado está apagado, y activarlo avisa y enseña el botón', async ({
   await expect(page.getByText('puede enviarla a la empresa')).toBeVisible()
   // Por el menú, como una persona: recargar en ese mismo instante podría adelantarse al guardado.
   await page.getByRole('navigation', { name: 'Principal' }).getByRole('link', { name: 'Vita' }).click()
-  await expect(page.getByRole('button', { name: 'Dictar' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Hablar' })).toBeVisible()
+})
+
+test('pulsar un día del calendario no sube la página', async ({ page }) => {
+  await page.goto('./calendario')
+  const day = page.locator('td button').nth(17)
+  await day.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+  const before = await page.evaluate(() => scrollY)
+  // Con el ratón, como una persona: la herramienta no debe desplazar la página por su cuenta.
+  const box = (await day.boundingBox())!
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  await expect(day).toHaveAttribute('aria-pressed', 'true')
+  expect(await page.evaluate(() => scrollY)).toBeGreaterThanOrEqual(before)
 })

@@ -11,6 +11,7 @@ export const MODULE_VIEWS: Partial<Record<ModuleId, ComponentType>> = {
   savings: lazy(async () => ({ default: (await import('./SavingsView')).SavingsView })),
   kidsMoney: lazy(async () => ({ default: (await import('./KidsMoneyView')).KidsMoneyView })),
   documents: lazy(async () => ({ default: (await import('./DocumentsView')).DocumentsView })),
+  cybersecurity: lazy(async () => ({ default: (await import('./CybersecurityView')).CybersecurityView })),
   shopping: lazy(async () => ({ default: (await import('./ShoppingView')).ShoppingView })),
   album: lazy(async () => ({ default: (await import('./AlbumView')).AlbumView })),
 }
