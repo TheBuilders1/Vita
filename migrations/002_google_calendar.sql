@@ -12,7 +12,7 @@ CREATE TABLE producto.google_oauth_states (
     state_hash text PRIMARY KEY,
     owner_user_id uuid NOT NULL REFERENCES gestion.users(id),
     code_verifier_ciphertext bytea NOT NULL,
-    nonce_hash text NOT NULL,
+    nonce_ciphertext bytea NOT NULL,
     expires_at timestamptz NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
 );

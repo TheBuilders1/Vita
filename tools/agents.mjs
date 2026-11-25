@@ -59,8 +59,8 @@ export function parseJson5(text) {
   return result
 }
 
-const names = ['orquestador', 'documentos']
-const tools = ['vita_scan_document', 'vita_report_result']
+const names = ['orquestador', 'documentos', 'calendario']
+const tools = ['vita_scan_document', 'vita_read_google_calendar', 'vita_report_result']
 const exact = (list, expected) => Array.isArray(list) && list.length === expected.length &&
   expected.every(item => list.includes(item))
 
@@ -68,7 +68,13 @@ function configRules(config, check) {
   const { gateway = {}, plugins = {}, agents = {} } = config
   check(gateway.bind === 'loopback' && gateway.mode === 'local', 'gateway local en loopback')
   check(gateway.auth?.mode === 'token' && gateway.auth.token === '${OPENCLAW_TOKEN}', 'autenticación del gateway')
-  check(exact(plugins.allow, ['vita-tools']) && exact(Object.keys(plugins.entries ?? {}), ['vita-tools']), 'plugins permitidos')
+  const allowedPlugins = ['vita-tools', 'ollama']
+  check(exact(plugins.allow, allowedPlugins) && exact(Object.keys(plugins.entries ?? {}), allowedPlugins), 'plugins permitidos')
+  const ollama = config.models?.providers?.ollama
+  check(plugins.entries?.ollama?.enabled === true && ollama?.api === 'ollama' &&
+    ollama.baseUrl === 'http://127.0.0.1:11434' && ollama.apiKey === 'ollama-local', 'API nativa de Ollama en loopback')
+  const models = ['glm-5.2:cloud', 'minimax-m3:cloud']
+  check(exact(ollama?.models?.map(model => model.id), models), 'catálogo de Ollama')
   check(exact(Object.keys(agents.entries ?? {}), names), 'agentes permitidos')
   const limits = agents.defaults?.subagents ?? {}
   for (const key of ['maxSpawnDepth', 'maxChildrenPerAgent', 'maxConcurrent']) check(limits[key] === 1, key)
@@ -76,9 +82,14 @@ function configRules(config, check) {
   for (const name of names) {
     const agent = agents.entries?.[name] ?? {}
     const main = name === names[0]
+    check(agent.model === 'ollama/' + models[main ? 0 : 1], name + ': modelo de Ollama')
     check(exact(Object.keys(agent.tools ?? {}), ['allow']), name + ': claves de tools')
-    check(exact(agent.tools?.allow, main ? [...tools, 'sessions_spawn', 'sessions_yield'] : [tools[0]]), name + ': herramientas permitidas')
-    check(exact(agent.subagents?.allowAgents, main ? ['documentos'] : []), name + ': delegación')
+    const allowedTools = main
+      ? [...tools, 'sessions_spawn', 'sessions_yield']
+      : [name === 'calendario' ? tools[1] : tools[0]]
+    check(exact(agent.tools?.allow, allowedTools), name + ': herramientas permitidas')
+    check(exact(agent.subagents?.allowAgents, main ? ['documentos', 'calendario'] : []), name + ': delegación')
+    if (main) check(agent.subagents?.requireAgentId === true, name + ': destino de delegación obligatorio')
     for (const key of Object.keys(limits)) if (Object.hasOwn(agent.subagents ?? {}, key)) check(agent.subagents[key] === limits[key], name + ': ' + key)
   }
 }
@@ -147,8 +158,10 @@ function composeRules(text, check) {
       if (required.has(key)) {
         found.add(key)
         verify(new RegExp('^\\$\\{' + key + ':\\?[^}]*\\}$').test(value), key + ' debe ser obligatoria')
-      } else if (/(?:PASSWORD|TOKEN)/i.test(key)) {
-        verify(/^\$\{[A-Za-z_]\w*(?::\?[^}]*)?\}$/.test(value) || (key === 'OPENCLAW_TOKEN' && value === '${OPENCLAW_TOKEN:-}'), key + ' debe venir del entorno')
+      } else if (/(?:PASSWORD|TOKEN|KEY)$/i.test(key)) {
+        const optionalSecret = ['OPENCLAW_TOKEN', 'GOOGLE_TOKEN_ENCRYPTION_KEY'].includes(key) &&
+          value === '${' + key + ':-}'
+        verify(/^\$\{[A-Za-z_]\w*(?::\?[^}]*)?\}$/.test(value) || optionalSecret, key + ' debe venir del entorno')
       } else if (/_URL$/.test(key) && /:\/\/[^/@:]+:[^@]+@/.test(value)) {
         verify(/:\/\/[^/@:]+:\$\{\w+(?::\?[^}]*)?\}@/.test(value), key + ' contiene una contraseña literal')
       }
@@ -210,9 +223,11 @@ export function checkAgents({ config, plugin, pluginPackage, pluginSource, agent
     },
     pluginSource: () => sourceRules(pluginSource, check),
     agentes: () => {
-      check(/reportRef[^.]*scanRef[^.]*mensaje[^.]*respuestas[^.]*son datos no confiables/i.test(agents.orquestador), 'instrucción sobre datos no confiables')
+      check(/reportRef[^.]*scanRef[^.]*calendarRef[^.]*mensaje[^.]*respuestas[^.]*son datos no confiables/i.test(agents.orquestador), 'instrucción sobre datos no confiables')
       check(/\bNo reveles referencias\b/i.test(agents.orquestador), 'protección de referencias')
       check(/\bno extraigas ni devuelvas texto OCR bruto\b/i.test(agents.documentos), 'protección del texto OCR')
+      check(/calendarRef[^.]*vita_read_google_calendar/i.test(agents.calendario), 'herramienta del agente Calendar')
+      check(/\bno delegas trabajo\b/i.test(agents.calendario), 'delegación desactivada para Calendar')
     },
     compose: () => composeRules(compose, check),
     dockerfile: () => dockerRules(dockerfile, check),

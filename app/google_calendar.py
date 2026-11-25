@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import secrets
 from datetime import date, datetime, time, timezone
-from hashlib import sha256
 from hmac import compare_digest
 from urllib.parse import urlencode, urlsplit, urlunsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -78,7 +77,7 @@ def exchange_authorization_code(
     code: str,
     state: str,
     code_verifier: str,
-    expected_nonce_hash: str,
+    expected_nonce: str,
 ) -> tuple[str | None, str]:
     flow = _oauth_flow(settings, state=state, code_verifier=code_verifier)
     callback_url = urlunsplit(
@@ -119,8 +118,8 @@ def exchange_authorization_code(
         raise CalendarIntegrationError("google_calendar_identity_invalid") from exc
     nonce = claims.get("nonce")
     if not isinstance(nonce, str) or not compare_digest(
-        sha256(nonce.encode("utf-8")).hexdigest(),
-        expected_nonce_hash,
+        nonce,
+        expected_nonce,
     ):
         raise CalendarIntegrationError("google_calendar_identity_invalid")
     google_subject = claims.get("sub")

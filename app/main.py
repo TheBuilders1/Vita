@@ -156,7 +156,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 """
                 INSERT INTO producto.google_oauth_states (
                     state_hash, owner_user_id, code_verifier_ciphertext,
-                    nonce_hash, expires_at
+                    nonce_ciphertext, expires_at
                 )
                 VALUES (%s, %s, %s, %s, now() + interval '10 minutes')
                 """,
@@ -164,7 +164,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     token_digest(state),
                     user_id,
                     encrypted_verifier,
-                    token_digest(nonce),
+                    encrypt_oauth_secret(settings, nonce),
                 ),
             )
         return {"authorizationUrl": url, "expiresIn": 600}
@@ -189,7 +189,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 """
                 DELETE FROM producto.google_oauth_states
                 WHERE state_hash = %s AND expires_at > now()
-                RETURNING owner_user_id, code_verifier_ciphertext, nonce_hash
+                RETURNING owner_user_id, code_verifier_ciphertext, nonce_ciphertext
                 """,
                 (token_digest(state),),
             ).fetchone()
@@ -205,7 +205,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 code,
                 state,
                 decrypt_oauth_secret(settings, oauth_state["code_verifier_ciphertext"]),
-                oauth_state["nonce_hash"],
+                decrypt_oauth_secret(settings, oauth_state["nonce_ciphertext"]),
             )
         except CalendarIntegrationError as exc:
             raise HTTPException(status_code=400, detail=exc.code) from exc

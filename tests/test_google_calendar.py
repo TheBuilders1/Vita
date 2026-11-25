@@ -1,5 +1,4 @@
 from datetime import date
-from hashlib import sha256
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
@@ -83,7 +82,7 @@ def test_oauth_exchange_uses_saved_pkce_verifier_and_only_granted_calendar_scope
         "one-time-code",
         "opaque-state-value-that-is-long-enough-123456789",
         "pkce-verifier-that-was-saved-by-vita-12345678901234567890",
-        sha256(b"oauth-nonce").hexdigest(),
+        "oauth-nonce",
     )
 
     assert refresh_token == "google-refresh-secret"
@@ -120,7 +119,7 @@ def test_oauth_exchange_rejects_unapproved_or_missing_calendar_scope(
             "one-time-code",
             "opaque-state-value-that-is-long-enough-123456789",
             "pkce-verifier-that-was-saved-by-vita-12345678901234567890",
-            sha256(b"oauth-nonce").hexdigest(),
+            "oauth-nonce",
         )
 
 
@@ -152,7 +151,7 @@ def test_oauth_exchange_rejects_a_replayed_or_mismatched_nonce(
             "one-time-code",
             "opaque-state-value-that-is-long-enough-123456789",
             "pkce-verifier-that-was-saved-by-vita-12345678901234567890",
-            sha256(b"expected-single-use-nonce").hexdigest(),
+            "expected-single-use-nonce",
         )
 
 

@@ -14,12 +14,27 @@
   },
 
   plugins: {
-    allow: ["vita-tools"],
+    allow: ["vita-tools", "ollama"],
     load: {
       paths: ["/absolute/path/to/Vita/openclaw/vita-tools"],
     },
     entries: {
       "vita-tools": { enabled: true },
+      ollama: { enabled: true },
+    },
+  },
+
+  models: {
+    providers: {
+      ollama: {
+        baseUrl: "http://127.0.0.1:11434",
+        api: "ollama",
+        apiKey: "ollama-local",
+        models: [
+          { id: "glm-5.2:cloud", name: "GLM 5.2 Cloud", input: ["text"] },
+          { id: "minimax-m3:cloud", name: "MiniMax M3 Cloud", input: ["text"] },
+        ],
+      },
     },
   },
 
@@ -40,6 +55,7 @@
     entries: {
       orquestador: {
         workspace: "/absolute/path/to/Vita/openclaw/agents/orquestador",
+        model: "ollama/glm-5.2:cloud",
         tools: {
           // Los hijos heredan las herramientas de esta lista. El orquestador
           // tiene ambas herramientas disponibles, pero sus instrucciones le
@@ -54,10 +70,12 @@
         },
         subagents: {
           allowAgents: ["documentos", "calendario"],
+          requireAgentId: true,
         },
       },
       calendario: {
         workspace: "/absolute/path/to/Vita/openclaw/agents/calendario",
+        model: "ollama/minimax-m3:cloud",
         tools: {
           allow: ["vita_read_google_calendar"],
         },
@@ -67,6 +85,7 @@
       },
       documentos: {
         workspace: "/absolute/path/to/Vita/openclaw/agents/documentos",
+        model: "ollama/minimax-m3:cloud",
         tools: {
           allow: ["vita_scan_document"],
         },

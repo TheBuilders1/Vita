@@ -103,7 +103,7 @@ flowchart LR
 
 - **Frontend** ([`frontend/`](frontend/)): guarda todo en el navegador. Cada módulo se declara una vez y de ahí salen validación, formularios, listados y agenda.
 - **Backend** ([`app/`](app/)): demo local para OCR y consultas de Google Calendar de solo lectura. Delega en agentes, pero la API es la única que autoriza, valida y escribe.
-- **Agentes** ([`openclaw/`](openclaw/)): interpretan y delegan. No tienen acceso a la base de datos, a las imágenes ni a internet.
+- **Agentes** ([`openclaw/`](openclaw/)): el orquestador usa GLM 5.2 y los subagentes usan MiniMax M3, mediante Ollama Cloud. No tienen acceso directo a la base de datos ni a las imágenes, ni herramientas de navegación web.
 
 | Capa | Tecnología |
 | --- | --- |

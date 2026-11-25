@@ -63,7 +63,8 @@ Las tablas de producto relacionan los datos con un hogar y su propietario. Los m
 
 - Linux para el `compose.yaml` incluido, que usa `network_mode: host` para permitir que la API en contenedor alcance un Gateway que escucha en el loopback del host.
 - Docker Engine y Docker Compose.
-- OpenClaw `2026.11.8` con Gateway HTTP privado y un modelo que soporte llamadas a herramientas. La versión está fijada porque el plugin usa la API experimental de OpenClaw.
+- OpenClaw `2026.11.8` con Gateway HTTP privado. La versión está fijada porque el plugin usa la API experimental de OpenClaw.
+- Ollama en el mismo host que el Gateway, con una cuenta de Ollama Cloud.
 - Node.js `24.22.1` o superior para el runtime del plugin.
 - Para ejecutar las pruebas fuera de Docker: Python `3.11` o superior. La imagen Docker del proyecto usa Python `3.12`.
 
@@ -88,6 +89,16 @@ Edita `.env` y reemplaza las contraseñas y tokens de ejemplo. Para las contrase
 
 Combina [`openclaw/config.example.json5`](../openclaw/config.example.json5) con tu configuración existente; reemplaza `/absolute/path/to/Vita` por la ruta absoluta de este repositorio. **No sobrescribas tu `openclaw.json`.** El ejemplo configura el Gateway con bind loopback, autenticación por token, el plugin y tres agentes con permisos limitados.
 
+El harness nativo de OpenClaw usa `ollama/glm-5.2:cloud` para `orquestador` y `ollama/minimax-m3:cloud` para `documentos` y `calendario`. Con Ollama escuchando en `127.0.0.1:11434`, inicia sesión y registra los modelos:
+
+```bash
+ollama signin
+ollama pull glm-5.2:cloud
+ollama pull minimax-m3:cloud
+```
+
+`ollama-local` es un marcador para el daemon local, no una credencial de nube. El Gateway usa la API nativa de Ollama (sin `/v1`) para las llamadas a herramientas. Aunque el Gateway y el daemon estén en loopback, la inferencia se realiza en Ollama Cloud: usa solo datos ficticios en el chat y en el calendario de prueba.
+
 Instala la dependencia TypeBox del plugin (los plugins enlazados no resuelven automáticamente sus dependencias), y después instálalo y comprueba sus herramientas:
 
 ```bash
@@ -105,6 +116,8 @@ El proceso del Gateway debe tener disponibles estas variables y reiniciarse desp
 export OPENCLAW_TOKEN='el-mismo-token-configurado-en-.env'
 export VITA_API_URL='http://127.0.0.1:8000'
 ```
+
+Tras reiniciar el Gateway, comprueba que `openclaw models list --provider ollama` liste ambos modelos. Si tu configuración ya define `agents.defaults.subagents.model`, quita ese ajuste del Gateway de Vita: tiene prioridad sobre el modelo del agente destino.
 
 Verifica que los agentes tengan cargados sus `AGENTS.md` y que sus herramientas estén restringidas como se indica en el ejemplo:
 

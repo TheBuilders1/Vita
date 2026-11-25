@@ -73,7 +73,7 @@ Los documentos y avisos son privados para su propietario. Pertenecer al hogar, i
 ## Hito 3 — Google Calendar en modo de lectura
 
 1. Crear OAuth client de tipo Web en Google Cloud, activar Calendar API y autorizar exactamente la URL callback de Vita. Usar `calendar.events.readonly`, nunca el scope de escritura. Usar un `state` aleatorio fuerte y redirigir tras procesar el callback a una URL limpia.
-2. El usuario inicia `/v1/calendar/connect` autenticado con Vita. Guardar el `state` hash y nonce OIDC hash, ligados al usuario, junto con el PKCE verifier cifrado, con TTL de 10 minutos; consumirlos una sola vez. Validar ID token y asociar la conexión con su `sub` verificado.
+2. El usuario inicia `/v1/calendar/connect` autenticado con Vita. Guardar el `state` hash y el nonce OIDC cifrado, ligados al usuario, junto con el PKCE verifier cifrado, con TTL de 10 minutos; consumirlos una sola vez. Validar ID token y asociar la conexión con su `sub` verificado.
 3. Cifrar refresh tokens en PostgreSQL con una clave Fernet externa al repo. El backend canjea/refresca tokens; OpenClaw nunca recibe tokens ni puede consultar Google de manera directa.
 4. Al crear un run, exigir un rango explícito e inclusivo de hasta 31 días. Consultar el calendario `primary`, expandir recurrencias y limitar a 50 eventos. Convertir inicios y finales con hora a UTC; incluir la zona IANA del hogar para interpretar y presentar horas locales.
 5. El plugin consume una `calendarRef` ligada al usuario/run, una sola vez y antes del deadline. El backend filtra la respuesta del proveedor a `summary`, `start`, `end` y `allDay`, la guarda y verifica coincidencia exacta cuando el orquestador la informa. No incluir links, asistentes ni descripciones.

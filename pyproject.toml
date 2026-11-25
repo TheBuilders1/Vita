@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Backend de demostración de Vita con FastAPI y OpenClaw"
 requires-python = ">=3.11"
 dependencies = [
-  "cryptography>=43,<47",
+  "cryptography>=50,<51",
   "fastapi>=0.115,<1",
   "google-auth>=2.40,<3",
   "google-auth-oauthlib>=1.2,<2",
@@ -22,10 +22,11 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest>=9.0.3,<10",
+  "setuptools>=84.2.1",
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/backend"]
+testpaths = ["tests"]
 addopts = "-q"
 
 [tool.setuptools.packages.find]
