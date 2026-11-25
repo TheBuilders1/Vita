@@ -22,10 +22,21 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pydantic import ValidationError
 
-from app.chat_attachments import ChatAttachmentError, extract_chat_attachment
+from app.chat_attachments import (
+    ChatAttachmentError,
+    extract_chat_attachment,
+    prepare_vision_image,
+)
+from app.chat_vision import (
+    VISION_REFERENCE_TTL_SECONDS,
+    ChatVisionCapacityError,
+    ChatVisionReferenceError,
+    ChatVisionVault,
+    VisionImage,
+)
 from app.config import Settings
 from app.database import connect, recover_interrupted_runs
 from app.google_calendar import (
@@ -45,6 +56,7 @@ from app.schemas import (
     ChatRequest,
     ChatAttachmentText,
     ChatResponse,
+    ChatVisionUploadResponse,
     ConfirmationAccepted,
     ConfirmBody,
     CreateRunBody,
@@ -132,6 +144,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.state.dispatcher = RunDispatcher()
     api.state.openclaw_client = OpenClawClient(config)
     api.state.ocr = TesseractOCR()
+    api.state.chat_vision = ChatVisionVault()
 
     @api.post("/v1/calendar/connect")
     def connect_google_calendar(
@@ -351,32 +364,78 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=exc.status_code, detail=exc.code) from exc
         return ChatAttachmentText(text=text)
 
+    @api.post("/v1/chat/vision-attachments", response_model=ChatVisionUploadResponse)
+    def stage_chat_vision_images(
+        request: Request,
+        files: list[UploadFile] = File(...),
+        user_id: UUID = Depends(authenticated_user),
+    ) -> ChatVisionUploadResponse:
+        if not files or len(files) > 3:
+            raise HTTPException(status_code=413, detail="too_many_vision_images")
+
+        settings = request.app.state.settings
+        images: list[VisionImage] = []
+        for upload in files:
+            data = upload.file.read(settings.max_upload_bytes + 1)
+            try:
+                normalized, mime_type = prepare_vision_image(
+                    data,
+                    upload.content_type,
+                    settings,
+                )
+            except ChatAttachmentError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=exc.code) from exc
+            images.append(VisionImage(data=normalized, mime_type=mime_type))
+
+        try:
+            vision_refs = request.app.state.chat_vision.store(user_id, images)
+        except ChatVisionCapacityError as exc:
+            raise HTTPException(status_code=429, detail="vision_queue_full") from exc
+        return ChatVisionUploadResponse(
+            visionRefs=vision_refs,
+            expiresIn=VISION_REFERENCE_TTL_SECONDS,
+        )
+
     @api.post("/v1/chat", response_model=ChatResponse)
     def chat(
         body: ChatRequest,
         request: Request,
         user_id: UUID = Depends(authenticated_user),
     ) -> ChatResponse:
+        vision_refs = body.vision_refs
+        vision_refs_valid = not vision_refs or request.app.state.chat_vision.belongs_to(
+            vision_refs,
+            user_id,
+        )
+        if not vision_refs_valid:
+            raise HTTPException(status_code=422, detail="invalid_vision_reference")
+
         try:
-            message = request.app.state.openclaw_client.chat(
-                f"vita:{user_id}:{body.conversation_id}",
-                body.message,
-                [item.model_dump() for item in body.context],
-                [item.text for item in body.attachments],
-            )
-        except GatewayTimeout as exc:
-            raise HTTPException(status_code=504, detail="assistant_timeout") from exc
-        except GatewayError as exc:
-            status_code = (
-                503
-                if exc.code in {"gateway_not_configured", "gateway_unavailable"}
-                else 502
-            )
-            raise HTTPException(
-                status_code=status_code,
-                detail="assistant_unavailable",
-            ) from exc
-        return ChatResponse(message=message)
+            try:
+                message = request.app.state.openclaw_client.chat(
+                    f"vita:{user_id}:{body.conversation_id}",
+                    body.message,
+                    [item.model_dump() for item in body.context],
+                    [item.text for item in body.attachments],
+                    vision_refs,
+                )
+            except GatewayTimeout as exc:
+                raise HTTPException(status_code=504, detail="assistant_timeout") from exc
+            except GatewayError as exc:
+                status_code = (
+                    503
+                    if exc.code in {"gateway_not_configured", "gateway_unavailable"}
+                    else 502
+                )
+                raise HTTPException(
+                    status_code=status_code,
+                    detail="assistant_unavailable",
+                ) from exc
+            return ChatResponse(message=message)
+        finally:
+            if vision_refs_valid:
+                for vision_ref in vision_refs:
+                    request.app.state.chat_vision.discard(vision_ref)
 
     @api.post(
         "/v1/documents",
@@ -476,6 +535,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         except ChatAttachmentError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.code) from exc
+        if not text.strip():
+            # Una foto sin texto no se manda: el modelo rellenaría la ficha inventando.
+            raise HTTPException(status_code=422, detail="no_text_found")
         try:
             # Una sesión por lectura: OpenClaw no mezcla documentos de distintas subidas.
             answer = request.app.state.openclaw_client.understand(
@@ -830,6 +892,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if disposition == "final":
             raise HTTPException(status_code=409, detail="run_already_final")
         return {"accepted": disposition == "accepted"}
+
+    @api.post("/v1/internal/chat-image", include_in_schema=False)
+    def internal_chat_image(request: Request) -> Response:
+        reference = bearer_token(request)
+        try:
+            image = request.app.state.chat_vision.consume(reference)
+        except ChatVisionReferenceError as exc:
+            raise HTTPException(status_code=404, detail="reference_not_found") from exc
+        return Response(
+            content=image.data,
+            media_type=image.mime_type,
+            headers={
+                "Cache-Control": "private, no-store",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
 
     @api.post("/v1/internal/scan", include_in_schema=False)
     def internal_scan(request: Request) -> dict[str, str]:

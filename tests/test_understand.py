@@ -116,3 +116,27 @@ def test_requires_a_token_a_known_hint_and_a_catalog() -> None:
     assert read(test, kind="receta").status_code == 422
     assert read(test, catalog="[]").json()["detail"] == "invalid_catalog"
     assert gateway.calls == []
+
+
+def test_an_image_without_text_is_not_sent_to_the_model() -> None:
+    """Sin texto no hay nada que leer: el modelo se inventaría la ficha."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    class NoText:
+        def read_text(self, data: bytes) -> str:
+            return "  "
+
+    test, gateway = client(json.dumps(BILL))
+    test.app.state.ocr = NoText()
+    output = BytesIO()
+    Image.new("RGB", (40, 40), "white").save(output, format="PNG")
+    response = test.post(
+        "/v1/documents/understand",
+        headers={"Authorization": f"Bearer {TOKEN}"},
+        data={"kind": "other", "catalog": json.dumps(CATALOG)},
+        files={"file": ("foto.png", output.getvalue(), "image/png")},
+    )
+    assert (response.status_code, response.json()["detail"]) == (422, "no_text_found")
+    assert gateway.calls == []

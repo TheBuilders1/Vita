@@ -7,7 +7,8 @@
     "tools": [
       "vita_scan_document",
       "vita_read_google_calendar",
-      "vita_report_result"
+      "vita_report_result",
+      "vita_analyze_chat_images"
     ]
   },
   "activation": {

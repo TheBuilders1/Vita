@@ -1,5 +1,6 @@
 import { Type } from "typebox";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
+import { analyzeChatImages } from "./vision.mjs";
 
 const dateOutcome = Type.Union([
   Type.Object(
@@ -57,6 +58,11 @@ const reportOutcome = Type.Union([
     { additionalProperties: false },
   ),
 ]);
+
+const visionAnalysis = Type.Object(
+  { text: Type.String({ minLength: 1, maxLength: 6000 }) },
+  { additionalProperties: false },
+);
 
 async function callVita(
   path: string,
@@ -161,6 +167,34 @@ export default definePluginEntry({
             },
           ],
           details: result,
+        };
+      },
+    });
+
+    api.registerTool({
+      name: "vita_analyze_chat_images",
+      description:
+        "Analiza imágenes que el usuario autorizó expresamente y que Vita conserva temporalmente en memoria. Envía solo imagen y pregunta a glm-5.3-flash en Ollama Cloud; nunca devuelve ni registra píxeles.",
+      parameters: Type.Object(
+        {
+          visionRefs: Type.Array(
+            Type.String({ minLength: 43, maxLength: 43, pattern: "^[A-Za-z0-9_-]{43}$" }),
+            { minItems: 1, maxItems: 3 },
+          ),
+          question: Type.String({ minLength: 1, maxLength: 500 }),
+        },
+        { additionalProperties: false },
+      ),
+      outputSchema: visionAnalysis,
+      async execute(_id, params) {
+        const text = await analyzeChatImages({
+          visionRefs: params.visionRefs,
+          question: params.question,
+          vitaApiUrl: process.env.VITA_API_URL,
+        });
+        return {
+          content: [{ type: "text", text }],
+          details: { text },
         };
       },
     });

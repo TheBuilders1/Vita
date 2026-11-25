@@ -46,7 +46,14 @@ class ChatAttachment(BaseModel):
 class ChatAttachmentText(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    text: str = Field(min_length=1, max_length=12_000)
+    text: str = Field(default="", max_length=12_000)
+
+
+class ChatVisionUploadResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    vision_refs: list[str] = Field(alias="visionRefs", min_length=1, max_length=3)
+    expires_in: int = Field(alias="expiresIn", ge=1, le=600)
 
 
 class ChatRequest(BaseModel):
@@ -56,6 +63,18 @@ class ChatRequest(BaseModel):
     conversation_id: str = Field(alias="conversationId", pattern=r"^[a-f0-9]{32}$")
     context: list[ChatContextItem] = Field(default_factory=list, max_length=20)
     attachments: list[ChatAttachment] = Field(default_factory=list, max_length=3)
+    vision_refs: list[Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{43}$")]] = Field(
+        default_factory=list,
+        alias="visionRefs",
+        max_length=3,
+    )
+
+    @field_validator("vision_refs")
+    @classmethod
+    def unique_vision_refs(cls, value: list[str]) -> list[str]:
+        if len(set(value)) != len(value):
+            raise ValueError("visionRefs must be unique")
+        return value
 
 
 class ChatResponse(BaseModel):

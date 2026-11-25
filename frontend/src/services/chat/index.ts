@@ -13,9 +13,11 @@ export {
   shouldUseAssistant,
   validateChatAttachments,
   CHAT_ATTACHMENT_ACCEPT,
+  isChatImage,
   MAX_CHAT_ATTACHMENT_BYTES,
   MAX_CHAT_ATTACHMENTS,
   type AssistantContextItem,
+  type ChatAssistantAttachment,
 } from './assistant'
 export type { ReviewedReply } from './visibility'
 export type { CardStatus, ChatContext, ChatLink, CompletionChoice, Fact, Proposal, Reply } from './types'

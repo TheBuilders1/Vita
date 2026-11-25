@@ -22,6 +22,8 @@ if [ ! -f "$profile_dir/openclaw.json" ]; then
   cp /opt/openclaw/config.compose.json "$profile_dir/openclaw.json"
   chmod 600 "$profile_dir/openclaw.json"
 fi
+node /usr/local/lib/openclaw/merge-vita-config.mjs \
+  "$profile_dir/openclaw.json" /opt/openclaw/config.compose.json
 for agent in calendario documentos orquestador; do
   if [ ! -d "$profile_dir/agents/$agent" ]; then
     cp -R "/opt/openclaw/agents/$agent" "$profile_dir/agents/$agent"

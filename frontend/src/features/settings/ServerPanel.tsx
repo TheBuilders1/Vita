@@ -21,7 +21,7 @@ export function ServerPanel() {
       <Panel title="Vita conectada">
         <Checkbox label="Hablar con el asistente del servidor" checked={connected} onChange={e => {
           settingsStore.getState().update({ connectedChat: e.target.checked }).then(() => toastStore.getState().show('Preferencia guardada')).catch((cause: unknown) => toastStore.getState().show(describeError(cause), 'error'))
-        }} help="Vita conversa a través del asistente del servidor de tu hogar, que usa un modelo en la nube. Se envía lo que escribes; si preguntas por algo del hogar, solo los datos que te enseñaría la respuesta; y de un archivo adjunto, solo su texto. Apuntar citas, tareas o la compra y las emergencias se resuelven en este dispositivo. Si lo apagas, todo se queda aquí." />
+        }} help="Vita conversa a través del asistente del servidor de tu hogar, que usa un modelo en la nube. Se envía lo que escribes; si preguntas por algo del hogar, solo los datos que te enseñaría la respuesta; y de un archivo adjunto, solo su texto, salvo que marques el análisis visual de una imagen: entonces la imagen puede enviarse a Ollama Cloud. Apuntar citas, tareas o la compra y las emergencias se resuelven en este dispositivo. Si lo apagas, todo se queda aquí." />
       </Panel>
     </>
   )

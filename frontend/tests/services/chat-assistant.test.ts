@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest'
-import { assistantContext, askOrchestrator, shouldUseAssistant, validateChatAttachments, type Reply } from '@/services/chat'
+import { assistantContext, askOrchestrator, isChatImage, shouldUseAssistant, validateChatAttachments, type Reply } from '@/services/chat'
 
 const message = 'Hola'
 const conversationId = 'a'.repeat(32)
@@ -14,7 +14,7 @@ test('envía pregunta y contexto filtrado, con la clave del proxy local', async 
   const [url, init] = request.mock.calls[0]!
   expect(url).toBe('/api/v1/chat')
   expect(new Headers(init?.headers).get('x-vita')).toBe('1')
-  expect(JSON.parse(String(init?.body))).toEqual({ message, conversationId, context, attachments: [] })
+  expect(JSON.parse(String(init?.body))).toEqual({ message, conversationId, context, attachments: [], visionRefs: [] })
 })
 
 test.each([
@@ -37,7 +37,7 @@ test('extrae el adjunto localmente y solo manda su texto al orquestador', async 
     .mockResolvedValueOnce(json({ text: 'Texto extraído localmente' }))
     .mockResolvedValueOnce(json({ message: 'He leído la nota.' }))
 
-  await expect(askOrchestrator({ message, conversationId, context: [], attachments: [file], fetch: request as never }))
+  await expect(askOrchestrator({ message, conversationId, context: [], attachments: [{ file, analyzeVisually: false }], fetch: request as never }))
     .resolves.toBe('He leído la nota.')
 
   expect(request.mock.calls.map(([url]) => url)).toEqual(['/api/v1/chat/attachments', '/api/v1/chat'])
@@ -45,6 +45,7 @@ test('extrae el adjunto localmente y solo manda su texto al orquestador', async 
   expect((uploaded.get('file') as File).name).toBe('nota.txt')
   expect(JSON.parse(String(request.mock.calls[1]![1]?.body))).toMatchObject({
     attachments: [{ text: 'Texto extraído localmente' }],
+    visionRefs: [],
   })
   expect(String(request.mock.calls[1]![1]?.body)).not.toContain('nota.txt')
 })
@@ -57,6 +58,8 @@ test('limita tipo, tamaño y número de adjuntos', () => {
   expect(validateChatAttachments(Array.from({ length: 4 }, () => image))).toContain('como máximo 3')
   expect(validateChatAttachments([new File(['x'], 'archivo.html', { type: 'text/html' })])).toContain('JPG/PNG')
   expect(validateChatAttachments([new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'grande.pdf', { type: 'application/pdf' })])).toContain('10 MB')
+  expect(isChatImage(image)).toBe(true)
+  expect(isChatImage(text)).toBe(false)
 })
 
 test('rechaza un adjunto no permitido antes de enviarlo', async () => {
@@ -65,10 +68,69 @@ test('rechaza un adjunto no permitido antes de enviarlo', async () => {
     message,
     conversationId,
     context: [],
-    attachments: [new File(['x'], 'script.html', { type: 'text/html' })],
+    attachments: [{ file: new File(['x'], 'script.html', { type: 'text/html' }), analyzeVisually: false }],
     fetch: request as never,
   })).rejects.toThrow('JPG/PNG')
   expect(request).not.toHaveBeenCalled()
+})
+
+test('si el OCR de una imagen no encuentra texto, no envía la imagen sin consentimiento', async () => {
+  const image = new File(['imagen'], 'foto.png', { type: 'image/png' })
+  const request = vi.fn().mockResolvedValueOnce(json({ text: '' }))
+
+  await expect(askOrchestrator({
+    message: '¿Qué pone?',
+    conversationId,
+    context: [],
+    attachments: [{ file: image, analyzeVisually: false }],
+    fetch: request as never,
+  })).rejects.toThrow('marca antes la casilla')
+  expect(request.mock.calls.map(([url]) => url)).toEqual(['/api/v1/chat/attachments'])
+})
+
+test('con consentimiento explícito, solo envía texto y referencias efímeras al orquestador', async () => {
+  const image = new File(['imagen'], 'foto.png', { type: 'image/png' })
+  const reference = 'v'.repeat(43)
+  const request = vi.fn()
+    .mockResolvedValueOnce(json({ text: '' }))
+    .mockResolvedValueOnce(json({ visionRefs: [reference], expiresIn: 300 }))
+    .mockResolvedValueOnce(json({ message: 'Veo un gráfico.' }))
+
+  await expect(askOrchestrator({
+    message: '¿Qué muestra el gráfico?',
+    conversationId,
+    context,
+    attachments: [{ file: image, analyzeVisually: true }],
+    fetch: request as never,
+  })).resolves.toBe('Veo un gráfico.')
+
+  expect(request.mock.calls.map(([url]) => url)).toEqual([
+    '/api/v1/chat/attachments',
+    '/api/v1/chat/vision-attachments',
+    '/api/v1/chat',
+  ])
+  const staged = request.mock.calls[1]![1]?.body as FormData
+  expect((staged.get('files') as File).name).toBe('foto.png')
+  const payload = String(request.mock.calls[2]![1]?.body)
+  expect(JSON.parse(payload)).toMatchObject({ attachments: [], visionRefs: [reference] })
+  expect(payload).not.toContain('foto.png')
+  expect(payload).not.toContain('imagen')
+})
+
+test('permite análisis consentido si falla el OCR local', async () => {
+  const image = new File(['imagen'], 'foto.png', { type: 'image/png' })
+  const request = vi.fn()
+    .mockResolvedValueOnce(json({}, 503))
+    .mockResolvedValueOnce(json({ visionRefs: ['r'.repeat(43)], expiresIn: 300 }))
+    .mockResolvedValueOnce(json({ message: 'El documento muestra una fecha.' }))
+
+  await expect(askOrchestrator({
+    message: '¿Qué fecha aparece?',
+    conversationId,
+    context: [],
+    attachments: [{ file: image, analyzeVisually: true }],
+    fetch: request as never,
+  })).resolves.toBe('El documento muestra una fecha.')
 })
 
 test('prepara solo hechos visibles de preguntas de agenda o fichas', () => {
